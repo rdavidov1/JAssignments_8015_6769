@@ -208,7 +208,7 @@ AnalyzeFile =: 3 : 0
 
   xml =. '<tokens>' , LF
   for_tok. tlist do.
-    xml =. xml , '   ' , (TokenToXml > tok) , LF
+    xml =. xml , (TokenToXml > tok) , LF
   end.
   xml =. xml , '</tokens>' , LF
 
