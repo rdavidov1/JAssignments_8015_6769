@@ -10,6 +10,7 @@ NB. ------- Global variables -------
 tokens  =: 0 # a:
 current =: 0
 output  =: ''
+indent  =: 0
 LF      =: a. {~ 10
 
 NB. ------- Load token xml -------
@@ -20,6 +21,7 @@ LoadTokens =: 3 : 0
   tokens =: }. }: lines
   current =: 0
   output =: ''
+  indent =: 0
 )
 
 NB. ------- Token access -------
@@ -43,9 +45,22 @@ Advance =: 3 : 0
 
 NB. ------- Output -------
 
-NB. Add line to output
+NB. Add line with indentation
 Write =: 3 : 0
-  output =: output , y , LF
+  spaces =. (2 * indent) # ' '
+  output =: output , spaces , y , LF
+)
+
+NB. Open non-terminal tag
+OpenTag =: 3 : 0
+  Write '<' , y , '>'
+  indent =: indent + 1
+)
+
+NB. Close non-terminal tag
+CloseTag =: 3 : 0
+  indent =: indent - 1
+  Write '</' , y , '>'
 )
 
 NB. Save xml output
@@ -94,7 +109,7 @@ NB. ------- Expressions -------
 
 NB. Compile expression
 CompileExpression =: 3 : 0
-  Write '<expression>'
+  OpenTag 'expression'
   CompileTerm ''
 
   while. IsOp '' do.
@@ -102,12 +117,12 @@ CompileExpression =: 3 : 0
     CompileTerm ''
   end.
 
-  Write '</expression>'
+  CloseTag 'expression'
 )
 
 NB. Compile term
 CompileTerm =: 3 : 0
-  Write '<term>'
+  OpenTag 'term'
 
   if. (IsInteger '') +. (IsString '') +. (IsKeyword 'true') +. (IsKeyword 'false') +. (IsKeyword 'null') +. (IsKeyword 'this') do.
     Write Advance ''
@@ -136,12 +151,12 @@ CompileTerm =: 3 : 0
     end.
   end.
 
-  Write '</term>'
+  CloseTag 'term'
 )
 
 NB. Compile expression list
 CompileExpressionList =: 3 : 0
-  Write '<expressionList>'
+  OpenTag 'expressionList'
 
   if. -. IsSymbol ')' do.
     CompileExpression ''
@@ -152,7 +167,7 @@ CompileExpressionList =: 3 : 0
     end.
   end.
 
-  Write '</expressionList>'
+  CloseTag 'expressionList'
 )
 
 NB. Compile subroutine call without extra tag
@@ -173,7 +188,7 @@ NB. ------- Statements -------
 
 NB. Compile statements block
 CompileStatements =: 3 : 0
-  Write '<statements>'
+  OpenTag 'statements'
 
   while. ((IsKeyword 'let') +. (IsKeyword 'if') +. (IsKeyword 'while') +. (IsKeyword 'do') +. (IsKeyword 'return')) do.
     if. IsKeyword 'let' do.
@@ -189,12 +204,12 @@ CompileStatements =: 3 : 0
     end.
   end.
 
-  Write '</statements>'
+  CloseTag 'statements'
 )
 
 NB. Compile let statement
 CompileLet =: 3 : 0
-  Write '<letStatement>'
+  OpenTag 'letStatement'
 
   Write Advance ''
   Write Advance ''
@@ -209,12 +224,12 @@ CompileLet =: 3 : 0
   CompileExpression ''
   Write Advance ''
 
-  Write '</letStatement>'
+  CloseTag 'letStatement'
 )
 
 NB. Compile if statement
 CompileIf =: 3 : 0
-  Write '<ifStatement>'
+  OpenTag 'ifStatement'
 
   Write Advance ''
   Write Advance ''
@@ -231,12 +246,12 @@ CompileIf =: 3 : 0
     Write Advance ''
   end.
 
-  Write '</ifStatement>'
+  CloseTag 'ifStatement'
 )
 
 NB. Compile while statement
 CompileWhile =: 3 : 0
-  Write '<whileStatement>'
+  OpenTag 'whileStatement'
 
   Write Advance ''
   Write Advance ''
@@ -246,23 +261,23 @@ CompileWhile =: 3 : 0
   CompileStatements ''
   Write Advance ''
 
-  Write '</whileStatement>'
+  CloseTag 'whileStatement'
 )
 
 NB. Compile do statement
 CompileDo =: 3 : 0
-  Write '<doStatement>'
+  OpenTag 'doStatement'
 
   Write Advance ''
   CompileSubroutineCall ''
   Write Advance ''
 
-  Write '</doStatement>'
+  CloseTag 'doStatement'
 )
 
 NB. Compile return statement
 CompileReturn =: 3 : 0
-  Write '<returnStatement>'
+  OpenTag 'returnStatement'
 
   Write Advance ''
 
@@ -272,14 +287,14 @@ CompileReturn =: 3 : 0
 
   Write Advance ''
 
-  Write '</returnStatement>'
+  CloseTag 'returnStatement'
 )
 
 NB. ------- Declarations -------
 
 NB. Compile var declaration
 CompileVarDec =: 3 : 0
-  Write '<varDec>'
+  OpenTag 'varDec'
 
   while. -. IsSymbol ';' do.
     Write Advance ''
@@ -287,12 +302,12 @@ CompileVarDec =: 3 : 0
 
   Write Advance ''
 
-  Write '</varDec>'
+  CloseTag 'varDec'
 )
 
 NB. Compile class variable declaration
 CompileClassVarDec =: 3 : 0
-  Write '<classVarDec>'
+  OpenTag 'classVarDec'
 
   while. -. IsSymbol ';' do.
     Write Advance ''
@@ -300,23 +315,23 @@ CompileClassVarDec =: 3 : 0
 
   Write Advance ''
 
-  Write '</classVarDec>'
+  CloseTag 'classVarDec'
 )
 
 NB. Compile parameter list
 CompileParameterList =: 3 : 0
-  Write '<parameterList>'
+  OpenTag 'parameterList'
 
   while. -. IsSymbol ')' do.
     Write Advance ''
   end.
 
-  Write '</parameterList>'
+  CloseTag 'parameterList'
 )
 
 NB. Compile subroutine body
 CompileSubroutineBody =: 3 : 0
-  Write '<subroutineBody>'
+  OpenTag 'subroutineBody'
 
   Write Advance ''
 
@@ -328,12 +343,12 @@ CompileSubroutineBody =: 3 : 0
 
   Write Advance ''
 
-  Write '</subroutineBody>'
+  CloseTag 'subroutineBody'
 )
 
 NB. Compile subroutine declaration
 CompileSubroutine =: 3 : 0
-  Write '<subroutineDec>'
+  OpenTag 'subroutineDec'
 
   Write Advance ''
   Write Advance ''
@@ -346,14 +361,14 @@ CompileSubroutine =: 3 : 0
 
   CompileSubroutineBody ''
 
-  Write '</subroutineDec>'
+  CloseTag 'subroutineDec'
 )
 
 NB. ------- Class -------
 
 NB. Compile class structure
 CompileClass =: 3 : 0
-  Write '<class>'
+  OpenTag 'class'
 
   Write Advance ''
   Write Advance ''
@@ -369,7 +384,7 @@ CompileClass =: 3 : 0
 
   Write Advance ''
 
-  Write '</class>'
+  CloseTag 'class'
 )
 
 NB. Startup message
