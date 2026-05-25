@@ -392,63 +392,10 @@ smoutput 'parser.ijs loaded.'
 
 NB. ------- Main -------
 
-NB. Check if path is a Jack file
-IsJackFile =: 3 : 0
-  '.jack' -: _5 {. y
-)
-
-NB. Get all Jack files from folder
-ListJackFiles =: 3 : 0
-
-  all =. 1!:0 < y , '/*'
-
-  names =. {."1 all
-
-  names #~ '.jack' -: each _5 {. each names
-
-)
-
-NB. Parse one Jack file
-ParseFile =: 3 : 0
-
-  inputFile =. y
-
-  NB. Create T.xml path
-  tfile =. (_5 }. inputFile) , 'T.xml'
-
-  NB. Create output xml path
-  ofile =. (_5 }. inputFile) , '.xml'
-
-  LoadTokens tfile
-
-  CompileClass ''
-
-  SaveOutput ofile
-
-  smoutput 'Written: ' , ofile
-
-)
-
 NB. Main parser entry
 Main =: 3 : 0
 
-  path =. y
-
-  NB. Single file
-  if. IsJackFile path do.
-
-    ParseFile path
-
-  else.
-
-    NB. Folder
-    files =. ListJackFiles path
-
-    for_file. files do.
-      ParseFile > file
-    end.
-
-  end.
+  ParseFile y
 
   0
 
