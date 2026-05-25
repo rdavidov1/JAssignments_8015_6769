@@ -389,3 +389,43 @@ CompileClass =: 3 : 0
 
 NB. Startup message
 smoutput 'parser.ijs loaded.'
+
+NB. ------- Main -------
+
+NB. Parse one Jack file
+ParseFile =: 3 : 0
+
+  NB. Create input T.xml path
+  tfile =. (}: _5 }. y) , 'T.xml'
+
+  NB. Create output xml path
+  ofile =. (}: _5 }. y) , '.xml'
+
+  LoadTokens tfile
+
+  CompileClass ''
+
+  SaveOutput ofile
+
+  smoutput 'Written: ', ofile
+
+)
+
+NB. Main parser entry
+Main =: 3 : 0
+
+  if. '.jack' -: _5 {. y do.
+
+    ParseFile y
+
+  else.
+
+    files =. 1!:0 y , '/*.jack'
+
+    for_f. files do.
+      ParseFile > f
+    end.
+
+  end.
+
+)
