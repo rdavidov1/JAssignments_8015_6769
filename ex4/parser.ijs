@@ -2,7 +2,7 @@ NB. ============================================================
 NB. parser.ijs - Jack Parser / Compilation Engine
 NB. ============================================================
 
-load 'C:/Users/Home/Documents/temp/ex4/ex4.ijs'
+load 'ex4.ijs'
 
 LF =: a. {~ 10
 
