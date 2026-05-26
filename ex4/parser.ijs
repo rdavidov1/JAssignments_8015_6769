@@ -1,402 +1,525 @@
 NB. ============================================================
-NB. parser.ijs - Jack Parser (Project 10, Part B)
+NB. parser.ijs - Jack Parser / Compilation Engine
 NB. ============================================================
 
-NB. Load tokenizer utilities from part A
 load 'C:/Users/Home/Documents/temp/ex4/ex4.ijs'
 
-NB. ------- Global variables -------
+LF =: a. {~ 10
 
-tokens  =: 0 # a:
-current =: 0
-output  =: ''
-indent  =: 0
-LF      =: a. {~ 10
+NB. ------- Parser state -------
 
-NB. ------- Load token xml -------
+tokens_list =: 0 # a:
+pointer =: 0
 
-NB. Load tokens from XxxT.xml
-LoadTokens =: 3 : 0
-  lines =. <;._2 ReadFile y
-  tokens =: }. }: lines
-  current =: 0
-  output =: ''
-  indent =: 0
+NB. Create spaces for XML indentation
+Spaces =: 3 : 0
+  y # ' '
 )
 
-NB. ------- Token access -------
-
-NB. Return current token
-Peek =: 3 : 0
-  > current { tokens
+NB. Create one XML line with indentation
+TagLine =: 4 : 0
+  (Spaces x) , y , LF
 )
 
-NB. Return token by offset
-PeekN =: 3 : 0
-  > (current + y) { tokens
+NB. Get token by index
+GetToken =: 3 : 0
+  if. y < # tokens_list do.
+    > y { tokens_list
+  else.
+    ''
+  end.
 )
 
-NB. Return current token and move forward
-Advance =: 3 : 0
-  tok =. > current { tokens
-  current =: current + 1
-  tok
+NB. Get current token
+CurrentToken =: 3 : 0
+  GetToken pointer
 )
 
-NB. ------- Output -------
-
-NB. Add line with indentation
-Write =: 3 : 0
-  spaces =. (2 * indent) # ' '
-  output =: output , spaces , y , LF
+NB. Move to next token
+MoveNext =: 3 : 0
+  pointer =: pointer + 1
 )
 
-NB. Open non-terminal tag
-OpenTag =: 3 : 0
-  Write '<' , y , '>'
-  indent =: indent + 1
+NB. Write current token and advance
+Consume =: 4 : 0
+  tok =. CurrentToken ''
+  MoveNext ''
+  (Spaces x) , tok , LF
 )
 
-NB. Close non-terminal tag
-CloseTag =: 3 : 0
-  indent =: indent - 1
-  Write '</' , y , '>'
+NB. Check if current token contains a specific value
+TokenIs =: 3 : 0
+  1 e. (' ' , y , ' ') E. CurrentToken ''
 )
 
-NB. Save xml output
-SaveOutput =: 3 : 0
-  output WriteFile y
+NB. Check next token value
+NextTokenIs =: 3 : 0
+  1 e. (' ' , y , ' ') E. GetToken pointer + 1
 )
 
-NB. ------- Token checks -------
-
-NB. Check current keyword
-IsKeyword =: 3 : 0
-  ('<keyword> ' , y , ' </keyword>') -: Peek ''
+NB. Check if current token contains text
+CurrentHas =: 3 : 0
+  1 e. y E. CurrentToken ''
 )
 
-NB. Check current symbol
-IsSymbol =: 3 : 0
-  ('<symbol> ' , y , ' </symbol>') -: Peek ''
-)
-
-NB. Check token prefix
-StartsWith =: 4 : 0
-  x -: (#x) {. y
-)
-
-NB. Check current identifier
+NB. Check identifier token
 IsIdentifier =: 3 : 0
-  '<identifier>' StartsWith Peek ''
-)
-
-NB. Check current integer
-IsInteger =: 3 : 0
-  '<integerConstant>' StartsWith Peek ''
-)
-
-NB. Check current string
-IsString =: 3 : 0
-  '<stringConstant>' StartsWith Peek ''
+  CurrentHas '<identifier>'
 )
 
 NB. Check expression operator
 IsOp =: 3 : 0
-  (IsSymbol '+') +. (IsSymbol '-') +. (IsSymbol '*') +. (IsSymbol '/') +. (IsSymbol '&amp;') +. (IsSymbol '|') +. (IsSymbol '&lt;') +. (IsSymbol '&gt;') +. (IsSymbol '=')
+  (TokenIs '+') +. (TokenIs '-') +. (TokenIs '*') +. (TokenIs '/') +. (TokenIs '&amp;') +. (TokenIs '|') +. (TokenIs '&lt;') +. (TokenIs '&gt;') +. (TokenIs '=')
 )
 
-NB. ------- Expressions -------
+NB. ------- Load tokens from XxxT.xml -------
 
-NB. Compile expression
+ReadParserTokens =: 3 : 0
+  lines =. <;._2 ReadFile y
+  lines =. dltb each lines
+  lines =. lines -. <''
+  lines =. lines -. <'<tokens>'
+  lines =. lines -. <'</tokens>'
+  lines
+)
+
+NB. ============================================================
+NB. class
+NB. ============================================================
+
+CompileClass =: 3 : 0
+  tokens_list =: y
+  pointer =: 0
+
+  out =. '<class>' , LF
+
+  out =. out , 2 Consume ''  NB. class
+  out =. out , 2 Consume ''  NB. className
+  out =. out , 2 Consume ''  NB. {
+
+  while. (TokenIs 'static') +. (TokenIs 'field') do.
+    out =. out , CompileClassVarDec ''
+  end.
+
+  while. (TokenIs 'constructor') +. (TokenIs 'function') +. (TokenIs 'method') do.
+    out =. out , CompileSubroutine ''
+  end.
+
+  out =. out , 2 Consume ''  NB. }
+  out =. out , '</class>' , LF
+
+  out
+)
+
+NB. ============================================================
+NB. classVarDec
+NB. ============================================================
+
+CompileClassVarDec =: 3 : 0
+  out =. 2 TagLine '<classVarDec>'
+
+  out =. out , 4 Consume ''  NB. static / field
+  out =. out , 4 Consume ''  NB. type
+  out =. out , 4 Consume ''  NB. varName
+
+  while. TokenIs ',' do.
+    out =. out , 4 Consume ''  NB. ,
+    out =. out , 4 Consume ''  NB. varName
+  end.
+
+  out =. out , 4 Consume ''  NB. ;
+  out =. out , 2 TagLine '</classVarDec>'
+
+  out
+)
+
+NB. ============================================================
+NB. subroutineDec
+NB. ============================================================
+
+CompileSubroutine =: 3 : 0
+  out =. 2 TagLine '<subroutineDec>'
+
+  out =. out , 4 Consume ''  NB. constructor / function / method
+  out =. out , 4 Consume ''  NB. return type
+  out =. out , 4 Consume ''  NB. subroutineName
+  out =. out , 4 Consume ''  NB. (
+
+  out =. out , CompileParameterList 4
+
+  out =. out , 4 Consume ''  NB. )
+
+  out =. out , CompileSubroutineBody 4
+
+  out =. out , 2 TagLine '</subroutineDec>'
+
+  out
+)
+
+NB. ============================================================
+NB. parameterList
+NB. ============================================================
+
+CompileParameterList =: 3 : 0
+  out =. y TagLine '<parameterList>'
+
+  if. -. TokenIs ')' do.
+    out =. out , (y + 2) Consume ''  NB. type
+    out =. out , (y + 2) Consume ''  NB. varName
+
+    while. TokenIs ',' do.
+      out =. out , (y + 2) Consume ''  NB. ,
+      out =. out , (y + 2) Consume ''  NB. type
+      out =. out , (y + 2) Consume ''  NB. varName
+    end.
+  end.
+
+  out =. out , y TagLine '</parameterList>'
+
+  out
+)
+
+NB. ============================================================
+NB. subroutineBody
+NB. ============================================================
+
+CompileSubroutineBody =: 3 : 0
+  out =. y TagLine '<subroutineBody>'
+
+  out =. out , (y + 2) Consume ''  NB. {
+
+  while. TokenIs 'var' do.
+    out =. out , CompileVarDec (y + 2)
+  end.
+
+  out =. out , CompileStatements (y + 2)
+
+  out =. out , (y + 2) Consume ''  NB. }
+
+  out =. out , y TagLine '</subroutineBody>'
+
+  out
+)
+
+NB. ============================================================
+NB. varDec
+NB. ============================================================
+
+CompileVarDec =: 3 : 0
+  out =. y TagLine '<varDec>'
+
+  out =. out , (y + 2) Consume ''  NB. var
+  out =. out , (y + 2) Consume ''  NB. type
+  out =. out , (y + 2) Consume ''  NB. varName
+
+  while. TokenIs ',' do.
+    out =. out , (y + 2) Consume ''  NB. ,
+    out =. out , (y + 2) Consume ''  NB. varName
+  end.
+
+  out =. out , (y + 2) Consume ''  NB. ;
+  out =. out , y TagLine '</varDec>'
+
+  out
+)
+
+NB. ============================================================
+NB. statements
+NB. ============================================================
+
+CompileStatements =: 3 : 0
+  out =. y TagLine '<statements>'
+
+  while. (TokenIs 'let') +. (TokenIs 'if') +. (TokenIs 'while') +. (TokenIs 'do') +. (TokenIs 'return') do.
+
+    if. TokenIs 'let' do.
+      out =. out , CompileLet (y + 2)
+
+    elseif. TokenIs 'if' do.
+      out =. out , CompileIf (y + 2)
+
+    elseif. TokenIs 'while' do.
+      out =. out , CompileWhile (y + 2)
+
+    elseif. TokenIs 'do' do.
+      out =. out , CompileDo (y + 2)
+
+    elseif. TokenIs 'return' do.
+      out =. out , CompileReturn (y + 2)
+
+    end.
+  end.
+
+  out =. out , y TagLine '</statements>'
+
+  out
+)
+
+NB. ============================================================
+NB. letStatement
+NB. ============================================================
+
+CompileLet =: 3 : 0
+  out =. y TagLine '<letStatement>'
+
+  out =. out , (y + 2) Consume ''  NB. let
+  out =. out , (y + 2) Consume ''  NB. varName
+
+  if. TokenIs '[' do.
+    out =. out , (y + 2) Consume ''  NB. [
+    out =. out , CompileExpression (y + 2)
+    out =. out , (y + 2) Consume ''  NB. ]
+  end.
+
+  out =. out , (y + 2) Consume ''  NB. =
+  out =. out , CompileExpression (y + 2)
+  out =. out , (y + 2) Consume ''  NB. ;
+
+  out =. out , y TagLine '</letStatement>'
+
+  out
+)
+
+NB. ============================================================
+NB. ifStatement
+NB. ============================================================
+
+CompileIf =: 3 : 0
+  out =. y TagLine '<ifStatement>'
+
+  out =. out , (y + 2) Consume ''  NB. if
+  out =. out , (y + 2) Consume ''  NB. (
+  out =. out , CompileExpression (y + 2)
+  out =. out , (y + 2) Consume ''  NB. )
+  out =. out , (y + 2) Consume ''  NB. {
+  out =. out , CompileStatements (y + 2)
+  out =. out , (y + 2) Consume ''  NB. }
+
+  if. TokenIs 'else' do.
+    out =. out , (y + 2) Consume ''  NB. else
+    out =. out , (y + 2) Consume ''  NB. {
+    out =. out , CompileStatements (y + 2)
+    out =. out , (y + 2) Consume ''  NB. }
+  end.
+
+  out =. out , y TagLine '</ifStatement>'
+
+  out
+)
+
+NB. ============================================================
+NB. whileStatement
+NB. ============================================================
+
+CompileWhile =: 3 : 0
+  out =. y TagLine '<whileStatement>'
+
+  out =. out , (y + 2) Consume ''  NB. while
+  out =. out , (y + 2) Consume ''  NB. (
+  out =. out , CompileExpression (y + 2)
+  out =. out , (y + 2) Consume ''  NB. )
+  out =. out , (y + 2) Consume ''  NB. {
+  out =. out , CompileStatements (y + 2)
+  out =. out , (y + 2) Consume ''  NB. }
+
+  out =. out , y TagLine '</whileStatement>'
+
+  out
+)
+
+NB. ============================================================
+NB. doStatement
+NB. ============================================================
+
+CompileDo =: 3 : 0
+  out =. y TagLine '<doStatement>'
+
+  out =. out , (y + 2) Consume ''  NB. do
+  out =. out , CompileSubroutineCall (y + 2)
+  out =. out , (y + 2) Consume ''  NB. ;
+
+  out =. out , y TagLine '</doStatement>'
+
+  out
+)
+
+NB. ============================================================
+NB. returnStatement
+NB. ============================================================
+
+CompileReturn =: 3 : 0
+  out =. y TagLine '<returnStatement>'
+
+  out =. out , (y + 2) Consume ''  NB. return
+
+  if. -. TokenIs ';' do.
+    out =. out , CompileExpression (y + 2)
+  end.
+
+  out =. out , (y + 2) Consume ''  NB. ;
+
+  out =. out , y TagLine '</returnStatement>'
+
+  out
+)
+
+NB. ============================================================
+NB. expression
+NB. ============================================================
+
 CompileExpression =: 3 : 0
-  OpenTag 'expression'
-  CompileTerm ''
+  out =. y TagLine '<expression>'
+
+  out =. out , CompileTerm (y + 2)
 
   while. IsOp '' do.
-    Write Advance ''
-    CompileTerm ''
+    out =. out , (y + 2) Consume ''  NB. operator
+    out =. out , CompileTerm (y + 2)
   end.
 
-  CloseTag 'expression'
+  out =. out , y TagLine '</expression>'
+
+  out
 )
 
-NB. Compile term
+NB. ============================================================
+NB. term
+NB. ============================================================
+
 CompileTerm =: 3 : 0
-  OpenTag 'term'
+  out =. y TagLine '<term>'
 
-  if. (IsInteger '') +. (IsString '') +. (IsKeyword 'true') +. (IsKeyword 'false') +. (IsKeyword 'null') +. (IsKeyword 'this') do.
-    Write Advance ''
+  if. TokenIs '(' do.
 
-  elseif. IsSymbol '(' do.
-    Write Advance ''
-    CompileExpression ''
-    Write Advance ''
+    out =. out , (y + 2) Consume ''  NB. (
+    out =. out , CompileExpression (y + 2)
+    out =. out , (y + 2) Consume ''  NB. )
 
-  elseif. (IsSymbol '-') +. (IsSymbol '~') do.
-    Write Advance ''
-    CompileTerm ''
+  elseif. (TokenIs '-') +. (TokenIs '~') do.
+
+    out =. out , (y + 2) Consume ''  NB. unary op
+    out =. out , CompileTerm (y + 2)
 
   elseif. IsIdentifier '' do.
-    if. '<symbol> [ </symbol>' -: PeekN 1 do.
-      Write Advance ''
-      Write Advance ''
-      CompileExpression ''
-      Write Advance ''
 
-    elseif. (('<symbol> ( </symbol>' -: PeekN 1) +. ('<symbol> . </symbol>' -: PeekN 1)) do.
-      CompileSubroutineCall ''
+    if. NextTokenIs '[' do.
+
+      out =. out , (y + 2) Consume ''  NB. varName
+      out =. out , (y + 2) Consume ''  NB. [
+      out =. out , CompileExpression (y + 2)
+      out =. out , (y + 2) Consume ''  NB. ]
+
+    elseif. (NextTokenIs '(') +. (NextTokenIs '.') do.
+
+      out =. out , CompileSubroutineCall (y + 2)
 
     else.
-      Write Advance ''
+
+      out =. out , (y + 2) Consume ''
+
     end.
+
+  else.
+
+    out =. out , (y + 2) Consume ''
+
   end.
 
-  CloseTag 'term'
+  out =. out , y TagLine '</term>'
+
+  out
 )
 
-NB. Compile expression list
+NB. ============================================================
+NB. expressionList
+NB. ============================================================
+
 CompileExpressionList =: 3 : 0
-  OpenTag 'expressionList'
+  out =. y TagLine '<expressionList>'
 
-  if. -. IsSymbol ')' do.
-    CompileExpression ''
+  if. -. TokenIs ')' do.
+    out =. out , CompileExpression (y + 2)
 
-    while. IsSymbol ',' do.
-      Write Advance ''
-      CompileExpression ''
+    while. TokenIs ',' do.
+      out =. out , (y + 2) Consume ''  NB. ,
+      out =. out , CompileExpression (y + 2)
     end.
   end.
 
-  CloseTag 'expressionList'
+  out =. out , y TagLine '</expressionList>'
+
+  out
 )
 
-NB. Compile subroutine call without extra tag
+NB. ============================================================
+NB. subroutineCall
+NB. ============================================================
+
 CompileSubroutineCall =: 3 : 0
-  Write Advance ''
+  out =. ''
 
-  if. IsSymbol '.' do.
-    Write Advance ''
-    Write Advance ''
+  out =. out , y Consume ''
+
+  if. TokenIs '.' do.
+    out =. out , y Consume ''
+    out =. out , y Consume ''
   end.
 
-  Write Advance ''
-  CompileExpressionList ''
-  Write Advance ''
+  out =. out , y Consume ''  NB. (
+  out =. out , CompileExpressionList y
+  out =. out , y Consume ''  NB. )
+
+  out
 )
 
-NB. ------- Statements -------
+NB. ============================================================
+NB. file handling
+NB. ============================================================
 
-NB. Compile statements block
-CompileStatements =: 3 : 0
-  OpenTag 'statements'
+ParseFile =: 3 : 0
+  inputFile =. y
 
-  while. ((IsKeyword 'let') +. (IsKeyword 'if') +. (IsKeyword 'while') +. (IsKeyword 'do') +. (IsKeyword 'return')) do.
-    if. IsKeyword 'let' do.
-      CompileLet ''
-    elseif. IsKeyword 'if' do.
-      CompileIf ''
-    elseif. IsKeyword 'while' do.
-      CompileWhile ''
-    elseif. IsKeyword 'do' do.
-      CompileDo ''
-    elseif. IsKeyword 'return' do.
-      CompileReturn ''
-    end.
-  end.
+  NB. Part A: create XxxT.xml first
+  AnalyzeFile inputFile
 
-  CloseTag 'statements'
+  base =. ((# inputFile) - 5) {. inputFile
+
+  tokenFile =. base , 'T.xml'
+  outputFile =. base , '.xml'
+
+  tokenLines =. ReadParserTokens tokenFile
+
+  finalXml =. CompileClass tokenLines
+
+  finalXml WriteFile outputFile
+
+  smoutput 'Written: ' , outputFile
 )
 
-NB. Compile let statement
-CompileLet =: 3 : 0
-  OpenTag 'letStatement'
+NB. ============================================================
+NB. Main
+NB. ============================================================
 
-  Write Advance ''
-  Write Advance ''
-
-  if. IsSymbol '[' do.
-    Write Advance ''
-    CompileExpression ''
-    Write Advance ''
-  end.
-
-  Write Advance ''
-  CompileExpression ''
-  Write Advance ''
-
-  CloseTag 'letStatement'
-)
-
-NB. Compile if statement
-CompileIf =: 3 : 0
-  OpenTag 'ifStatement'
-
-  Write Advance ''
-  Write Advance ''
-  CompileExpression ''
-  Write Advance ''
-  Write Advance ''
-  CompileStatements ''
-  Write Advance ''
-
-  if. IsKeyword 'else' do.
-    Write Advance ''
-    Write Advance ''
-    CompileStatements ''
-    Write Advance ''
-  end.
-
-  CloseTag 'ifStatement'
-)
-
-NB. Compile while statement
-CompileWhile =: 3 : 0
-  OpenTag 'whileStatement'
-
-  Write Advance ''
-  Write Advance ''
-  CompileExpression ''
-  Write Advance ''
-  Write Advance ''
-  CompileStatements ''
-  Write Advance ''
-
-  CloseTag 'whileStatement'
-)
-
-NB. Compile do statement
-CompileDo =: 3 : 0
-  OpenTag 'doStatement'
-
-  Write Advance ''
-  CompileSubroutineCall ''
-  Write Advance ''
-
-  CloseTag 'doStatement'
-)
-
-NB. Compile return statement
-CompileReturn =: 3 : 0
-  OpenTag 'returnStatement'
-
-  Write Advance ''
-
-  if. -. IsSymbol ';' do.
-    CompileExpression ''
-  end.
-
-  Write Advance ''
-
-  CloseTag 'returnStatement'
-)
-
-NB. ------- Declarations -------
-
-NB. Compile var declaration
-CompileVarDec =: 3 : 0
-  OpenTag 'varDec'
-
-  while. -. IsSymbol ';' do.
-    Write Advance ''
-  end.
-
-  Write Advance ''
-
-  CloseTag 'varDec'
-)
-
-NB. Compile class variable declaration
-CompileClassVarDec =: 3 : 0
-  OpenTag 'classVarDec'
-
-  while. -. IsSymbol ';' do.
-    Write Advance ''
-  end.
-
-  Write Advance ''
-
-  CloseTag 'classVarDec'
-)
-
-NB. Compile parameter list
-CompileParameterList =: 3 : 0
-  OpenTag 'parameterList'
-
-  while. -. IsSymbol ')' do.
-    Write Advance ''
-  end.
-
-  CloseTag 'parameterList'
-)
-
-NB. Compile subroutine body
-CompileSubroutineBody =: 3 : 0
-  OpenTag 'subroutineBody'
-
-  Write Advance ''
-
-  while. IsKeyword 'var' do.
-    CompileVarDec ''
-  end.
-
-  CompileStatements ''
-
-  Write Advance ''
-
-  CloseTag 'subroutineBody'
-)
-
-NB. Compile subroutine declaration
-CompileSubroutine =: 3 : 0
-  OpenTag 'subroutineDec'
-
-  Write Advance ''
-  Write Advance ''
-  Write Advance ''
-  Write Advance ''
-
-  CompileParameterList ''
-
-  Write Advance ''
-
-  CompileSubroutineBody ''
-
-  CloseTag 'subroutineDec'
-)
-
-NB. ------- Class -------
-
-NB. Compile class structure
-CompileClass =: 3 : 0
-  OpenTag 'class'
-
-  Write Advance ''
-  Write Advance ''
-  Write Advance ''
-
-  while. ((IsKeyword 'static') +. (IsKeyword 'field')) do.
-    CompileClassVarDec ''
-  end.
-
-  while. ((IsKeyword 'constructor') +. (IsKeyword 'function') +. (IsKeyword 'method')) do.
-    CompileSubroutine ''
-  end.
-
-  Write Advance ''
-
-  CloseTag 'class'
-)
-
-NB. Startup message
-smoutput 'parser.ijs loaded.'
-
-NB. ------- Main -------
-
-NB. Main parser entry
 Main =: 3 : 0
+  path =. y
 
-  ParseFile y
+  if. '.jack' -: _5 {. path do.
+    ParseFile path
+    return.
+  end.
+
+  files =. GetJackFiles path
+
+  if. 0 = # files do.
+    smoutput 'No .jack files found in: ' , path
+    return.
+  end.
+
+  for_f. files do.
+    ParseFile > f
+  end.
 
   0
-
 )
+
+smoutput 'parser.ijs loaded.'
