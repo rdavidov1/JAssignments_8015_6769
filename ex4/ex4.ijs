@@ -1,809 +1,809 @@
-NB. ============================================================
-NB. ex4.ijs - Jack Tokenizer (nand2tetris Project 10, Stage 1)
-NB. ============================================================
-NB. Usage (from jconsole):
-NB.   load 'ex4.ijs'
-NB.   Main '/path/to/SomeFile.jack'
-NB.   Main '/path/to/SomeFolder'
-NB. ============================================================
+NB. NB. ============================================================
+NB. NB. ex4.ijs - Jack Tokenizer (nand2tetris Project 10, Stage 1)
+NB. NB. ============================================================
+NB. NB. Usage (from jconsole):
+NB. NB.   load 'ex4.ijs'
+NB. NB.   Main '/path/to/SomeFile.jack'
+NB. NB.   Main '/path/to/SomeFolder'
+NB. NB. ============================================================
 
 
-NB. ------- Global constants -------
+NB. NB. ------- Global constants -------
 
-NB. Jack keywords as boxed list
-KEYWORDS =: ;: 'class constructor function method field static var int char boolean void true false null this let do if else while return'
+NB. NB. Jack keywords as boxed list
+NB. KEYWORDS =: ;: 'class constructor function method field static var int char boolean void true false null this let do if else while return'
 
-NB. Jack symbol characters (each is a single-token symbol)
-SYMBOLS =: '{}()[].,;+-*/&|<>=~'
+NB. NB. Jack symbol characters (each is a single-token symbol)
+NB. SYMBOLS =: '{}()[].,;+-*/&|<>=~'
 
-NB. Whitespace: space, tab(9), LF(10), CR(13)
-WS =: ' ' , (a.{~9) , (a.{~10) , (a.{~13)
+NB. NB. Whitespace: space, tab(9), LF(10), CR(13)
+NB. WS =: ' ' , (a.{~9) , (a.{~10) , (a.{~13)
 
-NB. All letter characters a-z and A-Z
-LETTERS =: (a.{~(a.i.'a')+i.26) , (a.{~(a.i.'A')+i.26)
+NB. NB. All letter characters a-z and A-Z
+NB. LETTERS =: (a.{~(a.i.'a')+i.26) , (a.{~(a.i.'A')+i.26)
 
-NB. Digit characters
-DIGITS =: '0123456789'
+NB. NB. Digit characters
+NB. DIGITS =: '0123456789'
 
-NB. ------- File I/O -------
+NB. NB. ------- File I/O -------
 
-NB. ReadFile 'path' -- reads file as flat character vector
-ReadFile =: 1!:1 @ boxopen
+NB. NB. ReadFile 'path' -- reads file as flat character vector
+NB. ReadFile =: 1!:1 @ boxopen
 
-NB. 'content' WriteFile 'path' -- writes string to file
-WriteFile =: 4 : 0
-  x 1!:2 < y
-)
-NB. ------- Character predicates -------
+NB. NB. 'content' WriteFile 'path' -- writes string to file
+NB. WriteFile =: 4 : 0
+NB.   x 1!:2 < y
+NB. )
+NB. NB. ------- Character predicates -------
 
-NB. IsDigit c -- 1 iff c is a digit character
-IsDigit =: 3 : 0
-  y e. DIGITS
-)
+NB. NB. IsDigit c -- 1 iff c is a digit character
+NB. IsDigit =: 3 : 0
+NB.   y e. DIGITS
+NB. )
 
-NB. IsLetter c -- 1 iff c is a-z or A-Z
-IsLetter =: 3 : 0
-  y e. LETTERS
-)
-NB. IsIdentifierChar c -- 1 iff c can appear inside an identifier
+NB. NB. IsLetter c -- 1 iff c is a-z or A-Z
+NB. IsLetter =: 3 : 0
+NB.   y e. LETTERS
+NB. )
+NB. NB. IsIdentifierChar c -- 1 iff c can appear inside an identifier
 
-IsIdentifierChar =: 3 : 0
-  (IsLetter y) +. (IsDigit y) +. y = '_'
-)
+NB. IsIdentifierChar =: 3 : 0
+NB.   (IsLetter y) +. (IsDigit y) +. y = '_'
+NB. )
 
-NB. IsSpace c -- 1 iff c is whitespace
-IsSpace =: 3 : 0
-  y e. WS
-)
-NB. ------- XML escaping -------
+NB. NB. IsSpace c -- 1 iff c is whitespace
+NB. IsSpace =: 3 : 0
+NB.   y e. WS
+NB. )
+NB. NB. ------- XML escaping -------
 
-NB. EscapeXml 'str' -- replaces <, >, &, " with XML entities
-EscapeXml =: 3 : 0
-  r =. ''
-  for_c. y do.
-    select. c
-      case. '<' do. r =. r , '&lt;'
-      case. '>' do. r =. r , '&gt;'
-      case. '"' do. r =. r , '&quot;'
-      case. '&' do. r =. r , '&amp;'
-      case.      do. r =. r , c
-    end.
-  end.
-  r
-)
-
-NB. ------- Tokenizer -------
-
-NB. Tokenize 'src' -- given Jack source text, return boxed list of (type;value) pairs
-Tokenize =: 3 : 0
-  src   =. y
-  n     =. # src
-  i     =. 0
-  tlist =. 0 # a:   NB. empty boxed list to accumulate tokens
-  LF    =. a. {~ 10
-
-  while. i < n do.
-    c =. i { src
-
-    NB. ---- Skip whitespace ----
-    if. IsSpace c do.
-      i =. i + 1
-      continue.
-    end.
-
-    NB. ---- Comments ----
-    if. (c = '/') *. (i + 1 < n) do.
-      nc =. (i + 1) { src
-
-      NB. Line comment: // to end of line
-      if. nc = '/' do.
-        i =. i + 2
-        while. (i < n) *. (LF ~: i { src) do. i =. i + 1 end.
-        continue.
-      end.
-
-      NB. Block comment: /* ... */ (includes doc comments /** ... */)
-      if. nc = '*' do.
-        i =. i + 2
-        closed =. 0
-        while. (i + 1 < n) *. -. closed do.
-          if. ('*' = i { src) *. ('/' = (i + 1) { src) do.
-            i      =. i + 2
-            closed =. 1
-          else.
-            i =. i + 1
-          end.
-        end.
-        if. -. closed do. i =. n end.  NB. safety: skip to end if unclosed
-        continue.
-      end.
-    end.
-
-    NB. ---- String constant: "..." ----
-    if. c = '"' do.
-      i =. i + 1           NB. skip opening double-quote
-      j =. i
-      while. (j < n) *. ('"' ~: j { src) do. j =. j + 1 end.
-      val   =. (j - i) {. i }. src   NB. content between quotes
-      tlist =. tlist , < ('stringConstant' ; val)
-      i     =. j + 1                  NB. skip closing double-quote
-      continue.
-    end.
-
-    NB. ---- Integer constant: digit sequence ----
-    if. IsDigit c do.
-      j =. i + 1
-      while. (j < n) *. IsDigit (j { src) do. j =. j + 1 end.
-      val   =. (j - i) {. i }. src
-      tlist =. tlist , < ('integerConstant' ; val)
-      i     =. j
-      continue.
-    end.
-
-    NB. ---- Symbol: single-character token ----
-    if. c e. SYMBOLS do.
-      tlist =. tlist , < ('symbol' ; (1 {. i }. src))
-      i     =. i + 1
-      continue.
-    end.
-
-    NB. ---- Keyword or Identifier: starts with letter or underscore ----
-    if. (IsLetter c) +. (c = '_') do.
-      j =. i + 1
-      while. (j < n) *. IsIdentifierChar (j { src) do. j =. j + 1 end.
-      val =. (j - i) {. i }. src
-      NB. Check if the word is a reserved keyword
-      if. (<val) e. KEYWORDS do.
-        tlist =. tlist , < ('keyword' ; val)
-      else.
-        tlist =. tlist , < ('identifier' ; val)
-      end.
-      i =. j
-      continue.
-    end.
-
-    NB. ---- Unknown/unexpected character: skip silently ----
-    i =. i + 1
-  end.
-
-  tlist
-)
-
-NB. ------- Token -> XML line -------
-
-NB. TokenToXml tok -- tok is a box holding (type ; value)
-NB. Produces:  <type> escaped_value </type>
-TokenToXml =: 3 : 0
-  typ     =. > 0 { y
-  val     =. > 1 { y
-  escaped =. EscapeXml val
-  '<' , typ , '> ' , escaped , ' </' , typ , '>'
-)
-
-NB. ------- Analyze a single .jack file -------
-
-NB. AnalyzeFile 'path/to/Xxx.jack' -- writes 'path/to/XxxT.xml'
-AnalyzeFile =: 3 : 0
-  path =. y
-  LF   =. a. {~ 10
-
-  NB. Build output path: strip '.jack', append 'T.xml'
-  NB. Find position of last '.' in path
-  dotpos =. <: # path    NB. default fallback
-  k      =. <: # path
-  while. k >: 0 do.
-    if. '.' = k { path do.
-      dotpos =. k
-      k      =. _1        NB. signal loop exit
-    else.
-      k =. k - 1
-    end.
-  end.
-  base    =. dotpos {. path       NB. path without extension
-  outpath =. base , 'T.xml'
-
-  NB. Read source, tokenize, format XML
-  src   =. ReadFile path
-  tlist =. Tokenize src
-
-  xml =. '<tokens>' , LF
-  for_tok. tlist do.
-    xml =. xml , (TokenToXml > tok) , LF
-  end.
-  xml =. xml , '</tokens>' , LF
-
-  NB. Write output
-  xml WriteFile outpath
-  smoutput 'Written: ' , outpath
-)
-
-NB. ------- Directory listing: get .jack files from a folder -------
-NB.for Hagit
-NB. GetJackFiles 'folder' -- returns boxed list of full paths to .jack files
-GetJackFiles =: 3 : 0
-  folder =. y
-  LF =. a. {~ 10
-
-  if. -. ({: folder) e. '/\' do.
-    folder =. folder , '/'
-  end.
-
- raw =. shell 'ls "' , folder , '"*.jack 2>/dev/null'
-
-  if. 0 = # raw do.
-    0 # a:
-  else.
-    files =. <;._2 raw , LF
-    files =. files #~ 0 < #&> files
-    files
-  end.
-)
-
-NB.for Ravid
-NB. GetJackFiles =: 3 : 0
-NB.   dir =. y
-NB.   if. '/' = {: dir do.
-NB.     dir =. }: dir
+NB. NB. EscapeXml 'str' -- replaces <, >, &, " with XML entities
+NB. EscapeXml =: 3 : 0
+NB.   r =. ''
+NB.   for_c. y do.
+NB.     select. c
+NB.       case. '<' do. r =. r , '&lt;'
+NB.       case. '>' do. r =. r , '&gt;'
+NB.       case. '"' do. r =. r , '&quot;'
+NB.       case. '&' do. r =. r , '&amp;'
+NB.       case.      do. r =. r , c
+NB.     end.
 NB.   end.
-NB.   files =. 1!:0 < dir , '/*.jack'
-NB.   if. 0 = # files do.
+NB.   r
+NB. )
+
+NB. NB. ------- Tokenizer -------
+
+NB. NB. Tokenize 'src' -- given Jack source text, return boxed list of (type;value) pairs
+NB. Tokenize =: 3 : 0
+NB.   src   =. y
+NB.   n     =. # src
+NB.   i     =. 0
+NB.   tlist =. 0 # a:   NB. empty boxed list to accumulate tokens
+NB.   LF    =. a. {~ 10
+
+NB.   while. i < n do.
+NB.     c =. i { src
+
+NB.     NB. ---- Skip whitespace ----
+NB.     if. IsSpace c do.
+NB.       i =. i + 1
+NB.       continue.
+NB.     end.
+
+NB.     NB. ---- Comments ----
+NB.     if. (c = '/') *. (i + 1 < n) do.
+NB.       nc =. (i + 1) { src
+
+NB.       NB. Line comment: // to end of line
+NB.       if. nc = '/' do.
+NB.         i =. i + 2
+NB.         while. (i < n) *. (LF ~: i { src) do. i =. i + 1 end.
+NB.         continue.
+NB.       end.
+
+NB.       NB. Block comment: /* ... */ (includes doc comments /** ... */)
+NB.       if. nc = '*' do.
+NB.         i =. i + 2
+NB.         closed =. 0
+NB.         while. (i + 1 < n) *. -. closed do.
+NB.           if. ('*' = i { src) *. ('/' = (i + 1) { src) do.
+NB.             i      =. i + 2
+NB.             closed =. 1
+NB.           else.
+NB.             i =. i + 1
+NB.           end.
+NB.         end.
+NB.         if. -. closed do. i =. n end.  NB. safety: skip to end if unclosed
+NB.         continue.
+NB.       end.
+NB.     end.
+
+NB.     NB. ---- String constant: "..." ----
+NB.     if. c = '"' do.
+NB.       i =. i + 1           NB. skip opening double-quote
+NB.       j =. i
+NB.       while. (j < n) *. ('"' ~: j { src) do. j =. j + 1 end.
+NB.       val   =. (j - i) {. i }. src   NB. content between quotes
+NB.       tlist =. tlist , < ('stringConstant' ; val)
+NB.       i     =. j + 1                  NB. skip closing double-quote
+NB.       continue.
+NB.     end.
+
+NB.     NB. ---- Integer constant: digit sequence ----
+NB.     if. IsDigit c do.
+NB.       j =. i + 1
+NB.       while. (j < n) *. IsDigit (j { src) do. j =. j + 1 end.
+NB.       val   =. (j - i) {. i }. src
+NB.       tlist =. tlist , < ('integerConstant' ; val)
+NB.       i     =. j
+NB.       continue.
+NB.     end.
+
+NB.     NB. ---- Symbol: single-character token ----
+NB.     if. c e. SYMBOLS do.
+NB.       tlist =. tlist , < ('symbol' ; (1 {. i }. src))
+NB.       i     =. i + 1
+NB.       continue.
+NB.     end.
+
+NB.     NB. ---- Keyword or Identifier: starts with letter or underscore ----
+NB.     if. (IsLetter c) +. (c = '_') do.
+NB.       j =. i + 1
+NB.       while. (j < n) *. IsIdentifierChar (j { src) do. j =. j + 1 end.
+NB.       val =. (j - i) {. i }. src
+NB.       NB. Check if the word is a reserved keyword
+NB.       if. (<val) e. KEYWORDS do.
+NB.         tlist =. tlist , < ('keyword' ; val)
+NB.       else.
+NB.         tlist =. tlist , < ('identifier' ; val)
+NB.       end.
+NB.       i =. j
+NB.       continue.
+NB.     end.
+
+NB.     NB. ---- Unknown/unexpected character: skip silently ----
+NB.     i =. i + 1
+NB.   end.
+
+NB.   tlist
+NB. )
+
+NB. NB. ------- Token -> XML line -------
+
+NB. NB. TokenToXml tok -- tok is a box holding (type ; value)
+NB. NB. Produces:  <type> escaped_value </type>
+NB. TokenToXml =: 3 : 0
+NB.   typ     =. > 0 { y
+NB.   val     =. > 1 { y
+NB.   escaped =. EscapeXml val
+NB.   '<' , typ , '> ' , escaped , ' </' , typ , '>'
+NB. )
+
+NB. NB. ------- Analyze a single .jack file -------
+
+NB. NB. AnalyzeFile 'path/to/Xxx.jack' -- writes 'path/to/XxxT.xml'
+NB. AnalyzeFile =: 3 : 0
+NB.   path =. y
+NB.   LF   =. a. {~ 10
+
+NB.   NB. Build output path: strip '.jack', append 'T.xml'
+NB.   NB. Find position of last '.' in path
+NB.   dotpos =. <: # path    NB. default fallback
+NB.   k      =. <: # path
+NB.   while. k >: 0 do.
+NB.     if. '.' = k { path do.
+NB.       dotpos =. k
+NB.       k      =. _1        NB. signal loop exit
+NB.     else.
+NB.       k =. k - 1
+NB.     end.
+NB.   end.
+NB.   base    =. dotpos {. path       NB. path without extension
+NB.   outpath =. base , 'T.xml'
+
+NB.   NB. Read source, tokenize, format XML
+NB.   src   =. ReadFile path
+NB.   tlist =. Tokenize src
+
+NB.   xml =. '<tokens>' , LF
+NB.   for_tok. tlist do.
+NB.     xml =. xml , (TokenToXml > tok) , LF
+NB.   end.
+NB.   xml =. xml , '</tokens>' , LF
+
+NB.   NB. Write output
+NB.   xml WriteFile outpath
+NB.   smoutput 'Written: ' , outpath
+NB. )
+
+NB. NB. ------- Directory listing: get .jack files from a folder -------
+NB. NB.for Hagit
+NB. NB. GetJackFiles 'folder' -- returns boxed list of full paths to .jack files
+NB. GetJackFiles =: 3 : 0
+NB.   folder =. y
+NB.   LF =. a. {~ 10
+
+NB.   if. -. ({: folder) e. '/\' do.
+NB.     folder =. folder , '/'
+NB.   end.
+
+NB.  raw =. shell 'ls "' , folder , '"*.jack 2>/dev/null'
+
+NB.   if. 0 = # raw do.
 NB.     0 # a:
 NB.   else.
-NB.     names =. {."1 files
-NB.     (< dir , '/') ,&.> names
+NB.     files =. <;._2 raw , LF
+NB.     files =. files #~ 0 < #&> files
+NB.     files
 NB.   end.
 NB. )
 
-NB. ------- Main -------
-
-NB. Main 'path' -- path is either Xxx.jack or a folder
-Main =: 3 : 0
-  path =. y
-
-  NB. Single-file mode: path ends with '.jack'
-  if. '.jack' -: (_5) {. path do.
-    AnalyzeFile path
-    return.
-  end.
-
-  NB. Folder mode: process every .jack file in the folder
-  jackfiles =. GetJackFiles path
-  if. 0 = # jackfiles do.
-    smoutput 'No .jack files found in: ' , path
-    return.
-  end.
-  for_f. jackfiles do.
-    AnalyzeFile > f
-  end.
-)
-
-NB. Startup message
-smoutput 'ex4.ijs loaded. Jack Tokenizer ready.'
-smoutput '  Single file:  Main ''/path/to/Xxx.jack'''
-smoutput '  Folder:       Main ''/path/to/Folder'''
-
-
-NB. ============================================================
-NB. Part B parser.ijs - Jack Parser / Compilation Engine
-NB. ============================================================
-
-
-LF =: a. {~ 10
-
-NB. ------- Parser state -------
-
-tokens_list =: 0 # a:
-pointer =: 0
-
-NB. Create spaces for XML indentation
-Spaces =: 3 : 0
-  y # ' '
-)
-
-NB. Create one XML line with indentation
-TagLine =: 4 : 0
-  (Spaces x) , y , LF
-)
-
-NB. Get token by index
-GetToken =: 3 : 0
-  if. y < # tokens_list do.
-    > y { tokens_list
-  else.
-    ''
-  end.
-)
-
-NB. Get current token
-CurrentToken =: 3 : 0
-  GetToken pointer
-)
-
-NB. Move to next token
-MoveNext =: 3 : 0
-  pointer =: pointer + 1
-)
-
-NB. Write current token and advance
-Consume =: 4 : 0
-  tok =. CurrentToken ''
-  MoveNext ''
-  (Spaces x) , tok , LF
-)
-
-NB. Check if current token contains a specific value
-TokenIs =: 3 : 0
-  1 e. (' ' , y , ' ') E. CurrentToken ''
-)
-
-NB. Check next token value
-NextTokenIs =: 3 : 0
-  1 e. (' ' , y , ' ') E. GetToken pointer + 1
-)
-
-NB. Check if current token contains text
-CurrentHas =: 3 : 0
-  1 e. y E. CurrentToken ''
-)
-
-NB. Check identifier token
-IsIdentifier =: 3 : 0
-  CurrentHas '<identifier>'
-)
-
-NB. Check expression operator
-IsOp =: 3 : 0
-  (TokenIs '+') +. (TokenIs '-') +. (TokenIs '*') +. (TokenIs '/') +. (TokenIs '&amp;') +. (TokenIs '|') +. (TokenIs '&lt;') +. (TokenIs '&gt;') +. (TokenIs '=')
-)
+NB. NB.for Ravid
+NB. NB. GetJackFiles =: 3 : 0
+NB. NB.   dir =. y
+NB. NB.   if. '/' = {: dir do.
+NB. NB.     dir =. }: dir
+NB. NB.   end.
+NB. NB.   files =. 1!:0 < dir , '/*.jack'
+NB. NB.   if. 0 = # files do.
+NB. NB.     0 # a:
+NB. NB.   else.
+NB. NB.     names =. {."1 files
+NB. NB.     (< dir , '/') ,&.> names
+NB. NB.   end.
+NB. NB. )
+
+NB. NB. ------- Main -------
+
+NB. NB. Main 'path' -- path is either Xxx.jack or a folder
+NB. Main =: 3 : 0
+NB.   path =. y
+
+NB.   NB. Single-file mode: path ends with '.jack'
+NB.   if. '.jack' -: (_5) {. path do.
+NB.     AnalyzeFile path
+NB.     return.
+NB.   end.
+
+NB.   NB. Folder mode: process every .jack file in the folder
+NB.   jackfiles =. GetJackFiles path
+NB.   if. 0 = # jackfiles do.
+NB.     smoutput 'No .jack files found in: ' , path
+NB.     return.
+NB.   end.
+NB.   for_f. jackfiles do.
+NB.     AnalyzeFile > f
+NB.   end.
+NB. )
+
+NB. NB. Startup message
+NB. smoutput 'ex4.ijs loaded. Jack Tokenizer ready.'
+NB. smoutput '  Single file:  Main ''/path/to/Xxx.jack'''
+NB. smoutput '  Folder:       Main ''/path/to/Folder'''
+
+
+NB. NB. ============================================================
+NB. NB. Part B parser.ijs - Jack Parser / Compilation Engine
+NB. NB. ============================================================
+
+
+NB. LF =: a. {~ 10
+
+NB. NB. ------- Parser state -------
+
+NB. tokens_list =: 0 # a:
+NB. pointer =: 0
+
+NB. NB. Create spaces for XML indentation
+NB. Spaces =: 3 : 0
+NB.   y # ' '
+NB. )
+
+NB. NB. Create one XML line with indentation
+NB. TagLine =: 4 : 0
+NB.   (Spaces x) , y , LF
+NB. )
+
+NB. NB. Get token by index
+NB. GetToken =: 3 : 0
+NB.   if. y < # tokens_list do.
+NB.     > y { tokens_list
+NB.   else.
+NB.     ''
+NB.   end.
+NB. )
+
+NB. NB. Get current token
+NB. CurrentToken =: 3 : 0
+NB.   GetToken pointer
+NB. )
+
+NB. NB. Move to next token
+NB. MoveNext =: 3 : 0
+NB.   pointer =: pointer + 1
+NB. )
+
+NB. NB. Write current token and advance
+NB. Consume =: 4 : 0
+NB.   tok =. CurrentToken ''
+NB.   MoveNext ''
+NB.   (Spaces x) , tok , LF
+NB. )
+
+NB. NB. Check if current token contains a specific value
+NB. TokenIs =: 3 : 0
+NB.   1 e. (' ' , y , ' ') E. CurrentToken ''
+NB. )
+
+NB. NB. Check next token value
+NB. NextTokenIs =: 3 : 0
+NB.   1 e. (' ' , y , ' ') E. GetToken pointer + 1
+NB. )
 
-NB. ------- Load tokens from XxxT.xml -------
+NB. NB. Check if current token contains text
+NB. CurrentHas =: 3 : 0
+NB.   1 e. y E. CurrentToken ''
+NB. )
 
-ReadParserTokens =: 3 : 0
-  lines =. <;._2 ReadFile y
-  lines =. dltb each lines
-  lines =. lines -. <''
-  lines =. lines -. <'<tokens>'
-  lines =. lines -. <'</tokens>'
-  lines
-)
+NB. NB. Check identifier token
+NB. IsIdentifier =: 3 : 0
+NB.   CurrentHas '<identifier>'
+NB. )
 
-NB. ============================================================
-NB. class
-NB. ============================================================
+NB. NB. Check expression operator
+NB. IsOp =: 3 : 0
+NB.   (TokenIs '+') +. (TokenIs '-') +. (TokenIs '*') +. (TokenIs '/') +. (TokenIs '&amp;') +. (TokenIs '|') +. (TokenIs '&lt;') +. (TokenIs '&gt;') +. (TokenIs '=')
+NB. )
 
-CompileClass =: 3 : 0
-  tokens_list =: y
-  pointer =: 0
+NB. NB. ------- Load tokens from XxxT.xml -------
 
-  out =. '<class>' , LF
+NB. ReadParserTokens =: 3 : 0
+NB.   lines =. <;._2 ReadFile y
+NB.   lines =. dltb each lines
+NB.   lines =. lines -. <''
+NB.   lines =. lines -. <'<tokens>'
+NB.   lines =. lines -. <'</tokens>'
+NB.   lines
+NB. )
 
-  out =. out , 2 Consume ''  NB. class
-  out =. out , 2 Consume ''  NB. className
-  out =. out , 2 Consume ''  NB. {
+NB. NB. ============================================================
+NB. NB. class
+NB. NB. ============================================================
 
-  while. (TokenIs 'static') +. (TokenIs 'field') do.
-    out =. out , CompileClassVarDec ''
-  end.
+NB. CompileClass =: 3 : 0
+NB.   tokens_list =: y
+NB.   pointer =: 0
 
-  while. (TokenIs 'constructor') +. (TokenIs 'function') +. (TokenIs 'method') do.
-    out =. out , CompileSubroutine ''
-  end.
+NB.   out =. '<class>' , LF
 
-  out =. out , 2 Consume ''  NB. }
-  out =. out , '</class>' , LF
+NB.   out =. out , 2 Consume ''  NB. class
+NB.   out =. out , 2 Consume ''  NB. className
+NB.   out =. out , 2 Consume ''  NB. {
 
-  out
-)
+NB.   while. (TokenIs 'static') +. (TokenIs 'field') do.
+NB.     out =. out , CompileClassVarDec ''
+NB.   end.
 
-NB. ============================================================
-NB. classVarDec
-NB. ============================================================
+NB.   while. (TokenIs 'constructor') +. (TokenIs 'function') +. (TokenIs 'method') do.
+NB.     out =. out , CompileSubroutine ''
+NB.   end.
 
-CompileClassVarDec =: 3 : 0
-  out =. 2 TagLine '<classVarDec>'
+NB.   out =. out , 2 Consume ''  NB. }
+NB.   out =. out , '</class>' , LF
 
-  out =. out , 4 Consume ''  NB. static / field
-  out =. out , 4 Consume ''  NB. type
-  out =. out , 4 Consume ''  NB. varName
+NB.   out
+NB. )
 
-  while. TokenIs ',' do.
-    out =. out , 4 Consume ''  NB. ,
-    out =. out , 4 Consume ''  NB. varName
-  end.
+NB. NB. ============================================================
+NB. NB. classVarDec
+NB. NB. ============================================================
 
-  out =. out , 4 Consume ''  NB. ;
-  out =. out , 2 TagLine '</classVarDec>'
+NB. CompileClassVarDec =: 3 : 0
+NB.   out =. 2 TagLine '<classVarDec>'
 
-  out
-)
+NB.   out =. out , 4 Consume ''  NB. static / field
+NB.   out =. out , 4 Consume ''  NB. type
+NB.   out =. out , 4 Consume ''  NB. varName
 
-NB. ============================================================
-NB. subroutineDec
-NB. ============================================================
+NB.   while. TokenIs ',' do.
+NB.     out =. out , 4 Consume ''  NB. ,
+NB.     out =. out , 4 Consume ''  NB. varName
+NB.   end.
 
-CompileSubroutine =: 3 : 0
-  out =. 2 TagLine '<subroutineDec>'
+NB.   out =. out , 4 Consume ''  NB. ;
+NB.   out =. out , 2 TagLine '</classVarDec>'
 
-  out =. out , 4 Consume ''  NB. constructor / function / method
-  out =. out , 4 Consume ''  NB. return type
-  out =. out , 4 Consume ''  NB. subroutineName
-  out =. out , 4 Consume ''  NB. (
+NB.   out
+NB. )
 
-  out =. out , CompileParameterList 4
+NB. NB. ============================================================
+NB. NB. subroutineDec
+NB. NB. ============================================================
 
-  out =. out , 4 Consume ''  NB. )
+NB. CompileSubroutine =: 3 : 0
+NB.   out =. 2 TagLine '<subroutineDec>'
 
-  out =. out , CompileSubroutineBody 4
+NB.   out =. out , 4 Consume ''  NB. constructor / function / method
+NB.   out =. out , 4 Consume ''  NB. return type
+NB.   out =. out , 4 Consume ''  NB. subroutineName
+NB.   out =. out , 4 Consume ''  NB. (
 
-  out =. out , 2 TagLine '</subroutineDec>'
+NB.   out =. out , CompileParameterList 4
 
-  out
-)
+NB.   out =. out , 4 Consume ''  NB. )
 
-NB. ============================================================
-NB. parameterList
-NB. ============================================================
+NB.   out =. out , CompileSubroutineBody 4
 
-CompileParameterList =: 3 : 0
-  out =. y TagLine '<parameterList>'
+NB.   out =. out , 2 TagLine '</subroutineDec>'
 
-  if. -. TokenIs ')' do.
-    out =. out , (y + 2) Consume ''  NB. type
-    out =. out , (y + 2) Consume ''  NB. varName
+NB.   out
+NB. )
 
-    while. TokenIs ',' do.
-      out =. out , (y + 2) Consume ''  NB. ,
-      out =. out , (y + 2) Consume ''  NB. type
-      out =. out , (y + 2) Consume ''  NB. varName
-    end.
-  end.
+NB. NB. ============================================================
+NB. NB. parameterList
+NB. NB. ============================================================
 
-  out =. out , y TagLine '</parameterList>'
+NB. CompileParameterList =: 3 : 0
+NB.   out =. y TagLine '<parameterList>'
 
-  out
-)
+NB.   if. -. TokenIs ')' do.
+NB.     out =. out , (y + 2) Consume ''  NB. type
+NB.     out =. out , (y + 2) Consume ''  NB. varName
 
-NB. ============================================================
-NB. subroutineBody
-NB. ============================================================
+NB.     while. TokenIs ',' do.
+NB.       out =. out , (y + 2) Consume ''  NB. ,
+NB.       out =. out , (y + 2) Consume ''  NB. type
+NB.       out =. out , (y + 2) Consume ''  NB. varName
+NB.     end.
+NB.   end.
 
-CompileSubroutineBody =: 3 : 0
-  out =. y TagLine '<subroutineBody>'
+NB.   out =. out , y TagLine '</parameterList>'
 
-  out =. out , (y + 2) Consume ''  NB. {
+NB.   out
+NB. )
 
-  while. TokenIs 'var' do.
-    out =. out , CompileVarDec (y + 2)
-  end.
+NB. NB. ============================================================
+NB. NB. subroutineBody
+NB. NB. ============================================================
 
-  out =. out , CompileStatements (y + 2)
+NB. CompileSubroutineBody =: 3 : 0
+NB.   out =. y TagLine '<subroutineBody>'
 
-  out =. out , (y + 2) Consume ''  NB. }
+NB.   out =. out , (y + 2) Consume ''  NB. {
 
-  out =. out , y TagLine '</subroutineBody>'
+NB.   while. TokenIs 'var' do.
+NB.     out =. out , CompileVarDec (y + 2)
+NB.   end.
 
-  out
-)
+NB.   out =. out , CompileStatements (y + 2)
 
-NB. ============================================================
-NB. varDec
-NB. ============================================================
+NB.   out =. out , (y + 2) Consume ''  NB. }
 
-CompileVarDec =: 3 : 0
-  out =. y TagLine '<varDec>'
+NB.   out =. out , y TagLine '</subroutineBody>'
 
-  out =. out , (y + 2) Consume ''  NB. var
-  out =. out , (y + 2) Consume ''  NB. type
-  out =. out , (y + 2) Consume ''  NB. varName
+NB.   out
+NB. )
 
-  while. TokenIs ',' do.
-    out =. out , (y + 2) Consume ''  NB. ,
-    out =. out , (y + 2) Consume ''  NB. varName
-  end.
+NB. NB. ============================================================
+NB. NB. varDec
+NB. NB. ============================================================
 
-  out =. out , (y + 2) Consume ''  NB. ;
-  out =. out , y TagLine '</varDec>'
+NB. CompileVarDec =: 3 : 0
+NB.   out =. y TagLine '<varDec>'
 
-  out
-)
+NB.   out =. out , (y + 2) Consume ''  NB. var
+NB.   out =. out , (y + 2) Consume ''  NB. type
+NB.   out =. out , (y + 2) Consume ''  NB. varName
 
-NB. ============================================================
-NB. statements
-NB. ============================================================
+NB.   while. TokenIs ',' do.
+NB.     out =. out , (y + 2) Consume ''  NB. ,
+NB.     out =. out , (y + 2) Consume ''  NB. varName
+NB.   end.
 
-CompileStatements =: 3 : 0
-  out =. y TagLine '<statements>'
+NB.   out =. out , (y + 2) Consume ''  NB. ;
+NB.   out =. out , y TagLine '</varDec>'
 
-  while. (TokenIs 'let') +. (TokenIs 'if') +. (TokenIs 'while') +. (TokenIs 'do') +. (TokenIs 'return') do.
+NB.   out
+NB. )
 
-    if. TokenIs 'let' do.
-      out =. out , CompileLet (y + 2)
+NB. NB. ============================================================
+NB. NB. statements
+NB. NB. ============================================================
 
-    elseif. TokenIs 'if' do.
-      out =. out , CompileIf (y + 2)
+NB. CompileStatements =: 3 : 0
+NB.   out =. y TagLine '<statements>'
 
-    elseif. TokenIs 'while' do.
-      out =. out , CompileWhile (y + 2)
+NB.   while. (TokenIs 'let') +. (TokenIs 'if') +. (TokenIs 'while') +. (TokenIs 'do') +. (TokenIs 'return') do.
 
-    elseif. TokenIs 'do' do.
-      out =. out , CompileDo (y + 2)
+NB.     if. TokenIs 'let' do.
+NB.       out =. out , CompileLet (y + 2)
 
-    elseif. TokenIs 'return' do.
-      out =. out , CompileReturn (y + 2)
+NB.     elseif. TokenIs 'if' do.
+NB.       out =. out , CompileIf (y + 2)
 
-    end.
-  end.
+NB.     elseif. TokenIs 'while' do.
+NB.       out =. out , CompileWhile (y + 2)
 
-  out =. out , y TagLine '</statements>'
+NB.     elseif. TokenIs 'do' do.
+NB.       out =. out , CompileDo (y + 2)
 
-  out
-)
+NB.     elseif. TokenIs 'return' do.
+NB.       out =. out , CompileReturn (y + 2)
 
-NB. ============================================================
-NB. letStatement
-NB. ============================================================
+NB.     end.
+NB.   end.
 
-CompileLet =: 3 : 0
-  out =. y TagLine '<letStatement>'
+NB.   out =. out , y TagLine '</statements>'
 
-  out =. out , (y + 2) Consume ''  NB. let
-  out =. out , (y + 2) Consume ''  NB. varName
+NB.   out
+NB. )
 
-  if. TokenIs '[' do.
-    out =. out , (y + 2) Consume ''  NB. [
-    out =. out , CompileExpression (y + 2)
-    out =. out , (y + 2) Consume ''  NB. ]
-  end.
+NB. NB. ============================================================
+NB. NB. letStatement
+NB. NB. ============================================================
 
-  out =. out , (y + 2) Consume ''  NB. =
-  out =. out , CompileExpression (y + 2)
-  out =. out , (y + 2) Consume ''  NB. ;
+NB. CompileLet =: 3 : 0
+NB.   out =. y TagLine '<letStatement>'
 
-  out =. out , y TagLine '</letStatement>'
+NB.   out =. out , (y + 2) Consume ''  NB. let
+NB.   out =. out , (y + 2) Consume ''  NB. varName
 
-  out
-)
+NB.   if. TokenIs '[' do.
+NB.     out =. out , (y + 2) Consume ''  NB. [
+NB.     out =. out , CompileExpression (y + 2)
+NB.     out =. out , (y + 2) Consume ''  NB. ]
+NB.   end.
 
-NB. ============================================================
-NB. ifStatement
-NB. ============================================================
+NB.   out =. out , (y + 2) Consume ''  NB. =
+NB.   out =. out , CompileExpression (y + 2)
+NB.   out =. out , (y + 2) Consume ''  NB. ;
 
-CompileIf =: 3 : 0
-  out =. y TagLine '<ifStatement>'
+NB.   out =. out , y TagLine '</letStatement>'
 
-  out =. out , (y + 2) Consume ''  NB. if
-  out =. out , (y + 2) Consume ''  NB. (
-  out =. out , CompileExpression (y + 2)
-  out =. out , (y + 2) Consume ''  NB. )
-  out =. out , (y + 2) Consume ''  NB. {
-  out =. out , CompileStatements (y + 2)
-  out =. out , (y + 2) Consume ''  NB. }
+NB.   out
+NB. )
 
-  if. TokenIs 'else' do.
-    out =. out , (y + 2) Consume ''  NB. else
-    out =. out , (y + 2) Consume ''  NB. {
-    out =. out , CompileStatements (y + 2)
-    out =. out , (y + 2) Consume ''  NB. }
-  end.
+NB. NB. ============================================================
+NB. NB. ifStatement
+NB. NB. ============================================================
 
-  out =. out , y TagLine '</ifStatement>'
+NB. CompileIf =: 3 : 0
+NB.   out =. y TagLine '<ifStatement>'
 
-  out
-)
+NB.   out =. out , (y + 2) Consume ''  NB. if
+NB.   out =. out , (y + 2) Consume ''  NB. (
+NB.   out =. out , CompileExpression (y + 2)
+NB.   out =. out , (y + 2) Consume ''  NB. )
+NB.   out =. out , (y + 2) Consume ''  NB. {
+NB.   out =. out , CompileStatements (y + 2)
+NB.   out =. out , (y + 2) Consume ''  NB. }
 
-NB. ============================================================
-NB. whileStatement
-NB. ============================================================
+NB.   if. TokenIs 'else' do.
+NB.     out =. out , (y + 2) Consume ''  NB. else
+NB.     out =. out , (y + 2) Consume ''  NB. {
+NB.     out =. out , CompileStatements (y + 2)
+NB.     out =. out , (y + 2) Consume ''  NB. }
+NB.   end.
 
-CompileWhile =: 3 : 0
-  out =. y TagLine '<whileStatement>'
+NB.   out =. out , y TagLine '</ifStatement>'
 
-  out =. out , (y + 2) Consume ''  NB. while
-  out =. out , (y + 2) Consume ''  NB. (
-  out =. out , CompileExpression (y + 2)
-  out =. out , (y + 2) Consume ''  NB. )
-  out =. out , (y + 2) Consume ''  NB. {
-  out =. out , CompileStatements (y + 2)
-  out =. out , (y + 2) Consume ''  NB. }
+NB.   out
+NB. )
 
-  out =. out , y TagLine '</whileStatement>'
+NB. NB. ============================================================
+NB. NB. whileStatement
+NB. NB. ============================================================
 
-  out
-)
+NB. CompileWhile =: 3 : 0
+NB.   out =. y TagLine '<whileStatement>'
 
-NB. ============================================================
-NB. doStatement
-NB. ============================================================
+NB.   out =. out , (y + 2) Consume ''  NB. while
+NB.   out =. out , (y + 2) Consume ''  NB. (
+NB.   out =. out , CompileExpression (y + 2)
+NB.   out =. out , (y + 2) Consume ''  NB. )
+NB.   out =. out , (y + 2) Consume ''  NB. {
+NB.   out =. out , CompileStatements (y + 2)
+NB.   out =. out , (y + 2) Consume ''  NB. }
 
-CompileDo =: 3 : 0
-  out =. y TagLine '<doStatement>'
+NB.   out =. out , y TagLine '</whileStatement>'
 
-  out =. out , (y + 2) Consume ''  NB. do
-  out =. out , CompileSubroutineCall (y + 2)
-  out =. out , (y + 2) Consume ''  NB. ;
+NB.   out
+NB. )
 
-  out =. out , y TagLine '</doStatement>'
+NB. NB. ============================================================
+NB. NB. doStatement
+NB. NB. ============================================================
 
-  out
-)
+NB. CompileDo =: 3 : 0
+NB.   out =. y TagLine '<doStatement>'
 
-NB. ============================================================
-NB. returnStatement
-NB. ============================================================
+NB.   out =. out , (y + 2) Consume ''  NB. do
+NB.   out =. out , CompileSubroutineCall (y + 2)
+NB.   out =. out , (y + 2) Consume ''  NB. ;
 
-CompileReturn =: 3 : 0
-  out =. y TagLine '<returnStatement>'
+NB.   out =. out , y TagLine '</doStatement>'
 
-  out =. out , (y + 2) Consume ''  NB. return
+NB.   out
+NB. )
 
-  if. -. TokenIs ';' do.
-    out =. out , CompileExpression (y + 2)
-  end.
+NB. NB. ============================================================
+NB. NB. returnStatement
+NB. NB. ============================================================
 
-  out =. out , (y + 2) Consume ''  NB. ;
+NB. CompileReturn =: 3 : 0
+NB.   out =. y TagLine '<returnStatement>'
 
-  out =. out , y TagLine '</returnStatement>'
+NB.   out =. out , (y + 2) Consume ''  NB. return
 
-  out
-)
+NB.   if. -. TokenIs ';' do.
+NB.     out =. out , CompileExpression (y + 2)
+NB.   end.
 
-NB. ============================================================
-NB. expression
-NB. ============================================================
+NB.   out =. out , (y + 2) Consume ''  NB. ;
 
-CompileExpression =: 3 : 0
-  out =. y TagLine '<expression>'
+NB.   out =. out , y TagLine '</returnStatement>'
 
-  out =. out , CompileTerm (y + 2)
+NB.   out
+NB. )
 
-  while. IsOp '' do.
-    out =. out , (y + 2) Consume ''  NB. operator
-    out =. out , CompileTerm (y + 2)
-  end.
+NB. NB. ============================================================
+NB. NB. expression
+NB. NB. ============================================================
 
-  out =. out , y TagLine '</expression>'
+NB. CompileExpression =: 3 : 0
+NB.   out =. y TagLine '<expression>'
 
-  out
-)
+NB.   out =. out , CompileTerm (y + 2)
 
-NB. ============================================================
-NB. term
-NB. ============================================================
+NB.   while. IsOp '' do.
+NB.     out =. out , (y + 2) Consume ''  NB. operator
+NB.     out =. out , CompileTerm (y + 2)
+NB.   end.
 
-CompileTerm =: 3 : 0
-  out =. y TagLine '<term>'
+NB.   out =. out , y TagLine '</expression>'
 
-  if. TokenIs '(' do.
+NB.   out
+NB. )
 
-    out =. out , (y + 2) Consume ''  NB. (
-    out =. out , CompileExpression (y + 2)
-    out =. out , (y + 2) Consume ''  NB. )
+NB. NB. ============================================================
+NB. NB. term
+NB. NB. ============================================================
 
-  elseif. (TokenIs '-') +. (TokenIs '~') do.
+NB. CompileTerm =: 3 : 0
+NB.   out =. y TagLine '<term>'
 
-    out =. out , (y + 2) Consume ''  NB. unary op
-    out =. out , CompileTerm (y + 2)
+NB.   if. TokenIs '(' do.
 
-  elseif. IsIdentifier '' do.
+NB.     out =. out , (y + 2) Consume ''  NB. (
+NB.     out =. out , CompileExpression (y + 2)
+NB.     out =. out , (y + 2) Consume ''  NB. )
 
-    if. NextTokenIs '[' do.
+NB.   elseif. (TokenIs '-') +. (TokenIs '~') do.
 
-      out =. out , (y + 2) Consume ''  NB. varName
-      out =. out , (y + 2) Consume ''  NB. [
-      out =. out , CompileExpression (y + 2)
-      out =. out , (y + 2) Consume ''  NB. ]
+NB.     out =. out , (y + 2) Consume ''  NB. unary op
+NB.     out =. out , CompileTerm (y + 2)
 
-    elseif. (NextTokenIs '(') +. (NextTokenIs '.') do.
+NB.   elseif. IsIdentifier '' do.
 
-      out =. out , CompileSubroutineCall (y + 2)
+NB.     if. NextTokenIs '[' do.
 
-    else.
+NB.       out =. out , (y + 2) Consume ''  NB. varName
+NB.       out =. out , (y + 2) Consume ''  NB. [
+NB.       out =. out , CompileExpression (y + 2)
+NB.       out =. out , (y + 2) Consume ''  NB. ]
 
-      out =. out , (y + 2) Consume ''
+NB.     elseif. (NextTokenIs '(') +. (NextTokenIs '.') do.
 
-    end.
+NB.       out =. out , CompileSubroutineCall (y + 2)
 
-  else.
+NB.     else.
 
-    out =. out , (y + 2) Consume ''
+NB.       out =. out , (y + 2) Consume ''
 
-  end.
+NB.     end.
 
-  out =. out , y TagLine '</term>'
+NB.   else.
 
-  out
-)
+NB.     out =. out , (y + 2) Consume ''
 
-NB. ============================================================
-NB. expressionList
-NB. ============================================================
+NB.   end.
 
-CompileExpressionList =: 3 : 0
-  out =. y TagLine '<expressionList>'
+NB.   out =. out , y TagLine '</term>'
 
-  if. -. TokenIs ')' do.
-    out =. out , CompileExpression (y + 2)
+NB.   out
+NB. )
 
-    while. TokenIs ',' do.
-      out =. out , (y + 2) Consume ''  NB. ,
-      out =. out , CompileExpression (y + 2)
-    end.
-  end.
+NB. NB. ============================================================
+NB. NB. expressionList
+NB. NB. ============================================================
 
-  out =. out , y TagLine '</expressionList>'
+NB. CompileExpressionList =: 3 : 0
+NB.   out =. y TagLine '<expressionList>'
 
-  out
-)
+NB.   if. -. TokenIs ')' do.
+NB.     out =. out , CompileExpression (y + 2)
 
-NB. ============================================================
-NB. subroutineCall
-NB. ============================================================
+NB.     while. TokenIs ',' do.
+NB.       out =. out , (y + 2) Consume ''  NB. ,
+NB.       out =. out , CompileExpression (y + 2)
+NB.     end.
+NB.   end.
 
-CompileSubroutineCall =: 3 : 0
-  out =. ''
+NB.   out =. out , y TagLine '</expressionList>'
 
-  out =. out , y Consume ''
+NB.   out
+NB. )
 
-  if. TokenIs '.' do.
-    out =. out , y Consume ''
-    out =. out , y Consume ''
-  end.
+NB. NB. ============================================================
+NB. NB. subroutineCall
+NB. NB. ============================================================
 
-  out =. out , y Consume ''  NB. (
-  out =. out , CompileExpressionList y
-  out =. out , y Consume ''  NB. )
+NB. CompileSubroutineCall =: 3 : 0
+NB.   out =. ''
 
-  out
-)
+NB.   out =. out , y Consume ''
 
-NB. ============================================================
-NB. file handling
-NB. ============================================================
+NB.   if. TokenIs '.' do.
+NB.     out =. out , y Consume ''
+NB.     out =. out , y Consume ''
+NB.   end.
 
-ParseFile =: 3 : 0
-  inputFile =. y
+NB.   out =. out , y Consume ''  NB. (
+NB.   out =. out , CompileExpressionList y
+NB.   out =. out , y Consume ''  NB. )
 
-  NB. Part A: create XxxT.xml first
-  AnalyzeFile inputFile
+NB.   out
+NB. )
 
-  base =. ((# inputFile) - 5) {. inputFile
+NB. NB. ============================================================
+NB. NB. file handling
+NB. NB. ============================================================
 
-  tokenFile =. base , 'T.xml'
-  outputFile =. base , '.xml'
+NB. ParseFile =: 3 : 0
+NB.   inputFile =. y
 
-  tokenLines =. ReadParserTokens tokenFile
+NB.   NB. Part A: create XxxT.xml first
+NB.   AnalyzeFile inputFile
 
-  finalXml =. CompileClass tokenLines
+NB.   base =. ((# inputFile) - 5) {. inputFile
 
-  finalXml WriteFile outputFile
+NB.   tokenFile =. base , 'T.xml'
+NB.   outputFile =. base , '.xml'
 
-  smoutput 'Written: ' , outputFile
-)
+NB.   tokenLines =. ReadParserTokens tokenFile
 
-NB. ============================================================
-NB. Main
-NB. ============================================================
+NB.   finalXml =. CompileClass tokenLines
 
-Main =: 3 : 0
-  path =. y
+NB.   finalXml WriteFile outputFile
 
-  if. '.jack' -: _5 {. path do.
-    ParseFile path
-    return.
-  end.
+NB.   smoutput 'Written: ' , outputFile
+NB. )
 
-  files =. GetJackFiles path
+NB. NB. ============================================================
+NB. NB. Main
+NB. NB. ============================================================
 
-  if. 0 = # files do.
-    smoutput 'No .jack files found in: ' , path
-    return.
-  end.
+NB. Main =: 3 : 0
+NB.   path =. y
 
-  for_f. files do.
-    ParseFile > f
-  end.
+NB.   if. '.jack' -: _5 {. path do.
+NB.     ParseFile path
+NB.     return.
+NB.   end.
 
-  0
-)
+NB.   files =. GetJackFiles path
 
-smoutput 'parser.ijs loaded.'
+NB.   if. 0 = # files do.
+NB.     smoutput 'No .jack files found in: ' , path
+NB.     return.
+NB.   end.
+
+NB.   for_f. files do.
+NB.     ParseFile > f
+NB.   end.
+
+NB.   0
+NB. )
+
+NB. smoutput 'parser.ijs loaded.'
