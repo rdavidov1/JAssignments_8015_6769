@@ -1,5 +1,5 @@
 NB. ============================================================
-NB. ex4.ijs - Jack Tokenizer (nand2tetris Project 10, Stage 1)
+NB. ex4_2.ijs - Jack Tokenizer (nand2tetris Project 10, Stage 1)
 NB. ============================================================
 NB. Usage (from jconsole):
 NB.   load 'ex4.ijs'
@@ -121,12 +121,25 @@ Tokenize =: 3 : 0
 
     NB. ---- String constant: "..." ----
     if. c = '"' do.
-      i =. i + 1           NB. skip opening double-quote
+      i =. i + 1
       j =. i
-      while. (j < n) *. ('"' ~: j { src) do. j =. j + 1 end.
-      val   =. (j - i) {. i }. src   NB. content between quotes
+
+      while. j < n do.
+        if. '"' = j { src do.
+          break.
+        end.
+        j =. j + 1
+      end.
+
+      val   =. (j - i) {. i }. src
       tlist =. tlist , < ('stringConstant' ; val)
-      i     =. j + 1                  NB. skip closing double-quote
+
+      if. j < n do.
+        i =. j + 1
+      else.
+        i =. n
+      end.
+
       continue.
     end.
 
