@@ -17,6 +17,7 @@ className =: ''
 subroutineName =: ''
 subroutineType =: ''
 labelCounter =: 0
+expressionCount =: 0
 
 NB. ============================================================
 NB. VM Writer
@@ -522,6 +523,26 @@ CompileReturn =: 3 : 0
   out
 )
 
+CompileExpressionList =: 3 : 0
+
+  out =. y TagLine '<expressionList>'
+
+  if. -. TokenIs ')' do.
+    out =. out , CompileExpression (y + 2)
+    expressionCount =: expressionCount + 1
+
+    while. TokenIs ',' do.
+      out =. out , (y + 2) Consume ''
+      out =. out , CompileExpression (y + 2)
+      expressionCount =: expressionCount + 1
+    end.
+  end.
+
+  out =. out , y TagLine '</expressionList>'
+
+  out
+)
+
 NB. ============================================================
 NB. Stage 1 - term identifier use
 NB. ============================================================
@@ -632,18 +653,22 @@ CompileExpression =: 3 : 0
 NB. ============================================================
 NB. Stage 1 - subroutineCall identifiers
 NB. ============================================================
-
 CompileSubroutineCall =: 3 : 0
 
   out =. ''
+  nArgs =. 0
 
   firstName =. GetTokenValue CurrentToken ''
 
   if. NextTokenIs '.' do.
 
     if. -. (KindOf firstName) -: 'none' do.
+      PushVar firstName
+      nArgs =. nArgs + 1
+      callName =. (TypeOf firstName) , '.'
       out =. out , y IdentifierInfoLine firstName
     else.
+      callName =. firstName , '.'
       out =. out , (Spaces y) , '<identifierInfo name="' , firstName , '" category="class" index="-1" usage="used" />' , LF
     end.
 
@@ -651,10 +676,17 @@ CompileSubroutineCall =: 3 : 0
     out =. out , y Consume ''
 
     secondName =. GetTokenValue CurrentToken ''
+    callName =. callName , secondName
+
     out =. out , (Spaces y) , '<identifierInfo name="' , secondName , '" category="subroutine" index="-1" usage="used" />' , LF
     out =. out , y Consume ''
 
   else.
+
+    'pointer' WritePush 0
+    nArgs =. nArgs + 1
+
+    callName =. className , '.' , firstName
 
     out =. out , (Spaces y) , '<identifierInfo name="' , firstName , '" category="subroutine" index="-1" usage="used" />' , LF
     out =. out , y Consume ''
@@ -662,14 +694,19 @@ CompileSubroutineCall =: 3 : 0
   end.
 
   out =. out , y Consume ''
+
+  beforeArgs =. expressionCount
+  expressionCount =: 0
   out =. out , CompileExpressionList y
+  nArgs =. nArgs + expressionCount
+  expressionCount =: beforeArgs
+
   out =. out , y Consume ''
+
+  callName WriteCall nArgs
 
   out
 )
-
-
-
 
 
 NB. ============================================================
@@ -681,7 +718,10 @@ Main =: 3 : 0
   path =. y
 
   if. '.jack' -: _5 {. path do.
+    vmOut =: ''
+    labelCounter =: 0
     ParseFile path
+    vmOut fwrites VmPath path
     return.
   end.
 
@@ -693,7 +733,10 @@ Main =: 3 : 0
   end.
 
   for_f. files do.
+    vmOut =: ''
+    labelCounter =: 0
     ParseFile > f
+    vmOut fwrites VmPath > f
   end.
 
   0
