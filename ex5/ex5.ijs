@@ -1,7 +1,12 @@
 NB. ex5.ijs - Project 11
 NB. ============================================================
 
-load 'C:/Users/Home/Documents/temp/ex4/ex4.ijs'
+NB. This path is for Ravid
+NB. load 'C:/Users/Home/Documents/temp/ex4/ex4.ijs'
+
+NB. This path is for Hagit
+load '/Users/hagitassulin/DesignPatterns/J-Assignments/ex4/ex4.ijs'
+
 
 NB. ============================================================
 NB. Project 11 - VM Code Generation
@@ -184,6 +189,46 @@ KindToSegment =: 3 : 0
   end.
 )
 
+PushVar =: 3 : 0
+  name =. y
+  seg =. KindToSegment KindOf name
+  idx =. IndexOf name
+  seg WritePush idx
+)
+
+PopVar =: 3 : 0
+  name =. y
+  seg =. KindToSegment KindOf name
+  idx =. IndexOf name
+  seg WritePop idx
+)
+
+WriteOp =: 3 : 0
+  if. y -: '+' do. WriteArithmetic 'add'
+  elseif. y -: '-' do. WriteArithmetic 'sub'
+  elseif. y -: '*' do. 'Math.multiply' WriteCall 2
+  elseif. y -: '/' do. 'Math.divide' WriteCall 2
+  elseif. y -: '&amp;' do. WriteArithmetic 'and'
+  elseif. y -: '&' do. WriteArithmetic 'and'
+  elseif. y -: '|' do. WriteArithmetic 'or'
+  elseif. y -: '&lt;' do. WriteArithmetic 'lt'
+  elseif. y -: '<' do. WriteArithmetic 'lt'
+  elseif. y -: '&gt;' do. WriteArithmetic 'gt'
+  elseif. y -: '>' do. WriteArithmetic 'gt'
+  elseif. y -: '=' do. WriteArithmetic 'eq'
+  end.
+)
+
+NewLabel =: 3 : 0
+  label =. y , '_' , ": labelCounter
+  labelCounter =: labelCounter + 1
+  label
+)
+
+VmPath =: 3 : 0
+  (_5 }. y) , '.vm'
+)
+
 NB. ============================================================
 NB. Helper - extract token value from XML token
 NB. ============================================================
@@ -338,6 +383,11 @@ CompileSubroutine =: 3 : 0
   out =. 2 TagLine '<subroutineDec>'
 
   subroutineType =: GetTokenValue CurrentToken ''
+
+  if. subroutineType -: 'method' do.
+    'this' Define (className ; 'argument')
+  end.
+
   out =. out , 4 Consume ''
 
   out =. out , 4 Consume ''
