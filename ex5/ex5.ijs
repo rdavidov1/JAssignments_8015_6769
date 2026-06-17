@@ -408,6 +408,38 @@ CompileSubroutine =: 3 : 0
   out
 )
 
+
+CompileSubroutineBody =: 3 : 0
+
+  out =. y TagLine '<subroutineBody>'
+
+  out =. out , (y + 2) Consume ''
+
+  while. TokenIs 'var' do.
+    out =. out , CompileVarDec (y + 2)
+  end.
+
+  fullName =. className , '.' , subroutineName
+  fullName WriteFunction varCount
+
+  if. subroutineType -: 'constructor' do.
+    'constant' WritePush fieldCount
+    'Memory.alloc' WriteCall 1
+    'pointer' WritePop 0
+  elseif. subroutineType -: 'method' do.
+    'argument' WritePush 0
+    'pointer' WritePop 0
+  end.
+
+  out =. out , CompileStatements (y + 2)
+
+  out =. out , (y + 2) Consume ''
+
+  out =. out , y TagLine '</subroutineBody>'
+
+  out
+)
+
 NB. ============================================================
 NB. Stage 1 - letStatement identifier use
 NB. ============================================================
