@@ -454,17 +454,70 @@ CompileLet =: 3 : 0
   out =. out , (y + 2) IdentifierInfoLine name
   out =. out , (y + 2) Consume ''
 
+  isArray =. 0
+
   if. TokenIs '[' do.
+    isArray =. 1
+    PushVar name
     out =. out , (y + 2) Consume ''
     out =. out , CompileExpression (y + 2)
+    WriteArithmetic 'add'
     out =. out , (y + 2) Consume ''
   end.
 
   out =. out , (y + 2) Consume ''
   out =. out , CompileExpression (y + 2)
+
+  if. isArray do.
+    'temp' WritePop 0
+    'pointer' WritePop 1
+    'temp' WritePush 0
+    'that' WritePop 0
+  else.
+    PopVar name
+  end.
+
   out =. out , (y + 2) Consume ''
 
   out =. out , y TagLine '</letStatement>'
+
+  out
+)
+
+CompileDo =: 3 : 0
+
+  out =. y TagLine '<doStatement>'
+
+  out =. out , (y + 2) Consume ''
+
+  out =. out , CompileSubroutineCall (y + 2)
+
+  'temp' WritePop 0
+
+  out =. out , (y + 2) Consume ''
+
+  out =. out , y TagLine '</doStatement>'
+
+  out
+)
+
+CompileReturn =: 3 : 0
+
+  out =. y TagLine '<returnStatement>'
+
+  out =. out , (y + 2) Consume ''
+
+  if. TokenIs ';' do.
+    'constant' WritePush 0
+  else.
+    out =. out , CompileExpression (y + 2)
+  end.
+
+  WriteReturn ''
+
+  out =. out , (y + 2) Consume ''
+
+  out =. out , y TagLine '</returnStatement>'
 
   out
 )
@@ -477,16 +530,25 @@ CompileTerm =: 3 : 0
 
   out =. y TagLine '<term>'
 
+  tokVal =. GetTokenValue CurrentToken ''
+
   if. TokenIs '(' do.
 
     out =. out , (y + 2) Consume ''
     out =. out , CompileExpression (y + 2)
     out =. out , (y + 2) Consume ''
 
-  elseif. (TokenIs '-') +. (TokenIs '~') do.
+  elseif. TokenIs '-' do.
 
     out =. out , (y + 2) Consume ''
     out =. out , CompileTerm (y + 2)
+    WriteArithmetic 'neg'
+
+  elseif. TokenIs '~' do.
+
+    out =. out , (y + 2) Consume ''
+    out =. out , CompileTerm (y + 2)
+    WriteArithmetic 'not'
 
   elseif. IsIdentifier '' do.
 
@@ -494,10 +556,14 @@ CompileTerm =: 3 : 0
 
     if. NextTokenIs '[' do.
 
+      PushVar name
       out =. out , (y + 2) IdentifierInfoLine name
       out =. out , (y + 2) Consume ''
       out =. out , (y + 2) Consume ''
       out =. out , CompileExpression (y + 2)
+      WriteArithmetic 'add'
+      'pointer' WritePop 1
+      'that' WritePush 0
       out =. out , (y + 2) Consume ''
 
     elseif. (NextTokenIs '(') +. (NextTokenIs '.') do.
@@ -506,18 +572,59 @@ CompileTerm =: 3 : 0
 
     else.
 
+      PushVar name
       out =. out , (y + 2) IdentifierInfoLine name
       out =. out , (y + 2) Consume ''
 
     end.
 
+  elseif. tokVal -: 'true' do.
+
+    'constant' WritePush 0
+    WriteArithmetic 'not'
+    out =. out , (y + 2) Consume ''
+
+  elseif. tokVal -: 'false' do.
+
+    'constant' WritePush 0
+    out =. out , (y + 2) Consume ''
+
+  elseif. tokVal -: 'null' do.
+
+    'constant' WritePush 0
+    out =. out , (y + 2) Consume ''
+
+  elseif. tokVal -: 'this' do.
+
+    'pointer' WritePush 0
+    out =. out , (y + 2) Consume ''
+
   else.
 
+    'constant' WritePush ". tokVal
     out =. out , (y + 2) Consume ''
 
   end.
 
   out =. out , y TagLine '</term>'
+
+  out
+)
+
+CompileExpression =: 3 : 0
+
+  out =. y TagLine '<expression>'
+
+  out =. out , CompileTerm (y + 2)
+
+  while. (TokenIs '+') +. (TokenIs '-') +. (TokenIs '*') +. (TokenIs '/') +. (TokenIs '&amp;') +. (TokenIs '&') +. (TokenIs '|') +. (TokenIs '&lt;') +. (TokenIs '<') +. (TokenIs '&gt;') +. (TokenIs '>') +. (TokenIs '=') do.
+    op =. GetTokenValue CurrentToken ''
+    out =. out , (y + 2) Consume ''
+    out =. out , CompileTerm (y + 2)
+    WriteOp op
+  end.
+
+  out =. out , y TagLine '</expression>'
 
   out
 )
