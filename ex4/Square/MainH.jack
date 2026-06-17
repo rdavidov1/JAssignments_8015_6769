@@ -1,0 +1,15 @@
+class Main
+{
+	function void main()
+	{
+		var Test4 t;
+		
+		let t = Test4.new(1, 2, "ABC");
+		
+		do t.methodOne();
+		
+		do Test4.funcOne();
+		
+		return;
+	}
+}

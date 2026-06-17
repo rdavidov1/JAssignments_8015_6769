@@ -7,6 +7,7 @@ NB.   Main '/path/to/SomeFile.jack'
 NB.   Main '/path/to/SomeFolder'
 NB. ============================================================
 
+NB. load 'C:/Users/Home/Documents/temp/ex5/ex5.ijs'
 
 NB. ------- Global constants -------
 
@@ -282,6 +283,39 @@ smoutput 'ex4.ijs loaded. Jack Tokenizer ready.'
 smoutput '  Single file:  Main ''/path/to/Xxx.jack'''
 smoutput '  Folder:       Main ''/path/to/Folder'''
 
+NB. ============================================================
+NB. VM Writer
+NB. ============================================================
+
+vmOut =: ''
+
+WriteVM =: 3 : 0
+  vmOut =: vmOut , y , LF
+)
+
+WritePush =: 4 : 0
+  WriteVM 'push ' , x , ' ' , ": y
+)
+
+WritePop =: 4 : 0
+  WriteVM 'pop ' , x , ' ' , ": y
+)
+
+WriteArithmetic =: 3 : 0
+  WriteVM y
+)
+
+WriteCall =: 4 : 0
+  WriteVM 'call ' , x , ' ' , ": y
+)
+
+WriteFunction =: 4 : 0
+  WriteVM 'function ' , x , ' ' , ": y
+)
+
+WriteReturn =: 3 : 0
+  WriteVM 'return'
+)
 
 NB. ============================================================
 NB. Part B parser.ijs - Jack Parser / Compilation Engine
@@ -370,51 +404,82 @@ ReadParserTokens =: 3 : 0
 NB. ============================================================
 NB. class
 NB. ============================================================
-
 CompileClass =: 3 : 0
+
   tokens_list =: y
   pointer =: 0
 
   out =. '<class>' , LF
 
-  out =. out , 2 Consume ''  NB. class
-  out =. out , 2 Consume ''  NB. className
-  out =. out , 2 Consume ''  NB. {
+    NB. class
+    out =. out , 2 Consume ''
+  className =: GetTokenValue CurrentToken ''
+
+  out =. out , 2 Consume ''      NB. className
+
+  out =. out , 2 Consume ''      NB. {
 
   while. (TokenIs 'static') +. (TokenIs 'field') do.
-    out =. out , CompileClassVarDec ''
+
+      out =. out , CompileClassVarDec ''
+
   end.
 
-  while. (TokenIs 'constructor') +. (TokenIs 'function') +. (TokenIs 'method') do.
-    out =. out , CompileSubroutine ''
-  end.
+    while. (TokenIs 'constructor') +. (TokenIs 'function') +. (TokenIs 'method') do.
 
-  out =. out , 2 Consume ''  NB. }
+        out =. out , CompileSubroutine ''
+
+    end.
+
+
+  out =. out , 2 Consume ''      NB. }
+
   out =. out , '</class>' , LF
 
   out
+
 )
+
 
 NB. ============================================================
 NB. classVarDec
 NB. ============================================================
-
 CompileClassVarDec =: 3 : 0
+
   out =. 2 TagLine '<classVarDec>'
 
-  out =. out , 4 Consume ''  NB. static / field
-  out =. out , 4 Consume ''  NB. type
-  out =. out , 4 Consume ''  NB. varName
+  kind =. GetTokenValue CurrentToken ''
+
+  out =. out , 4 Consume ''
+
+  type =. GetTokenValue CurrentToken ''
+
+  out =. out , 4 Consume ''
+
+  name =. GetTokenValue CurrentToken ''
+
+  name Define (type ; kind)
+
+  out =. out , 4 Consume ''
 
   while. TokenIs ',' do.
-    out =. out , 4 Consume ''  NB. ,
-    out =. out , 4 Consume ''  NB. varName
+
+    out =. out , 4 Consume ''
+
+    name =. GetTokenValue CurrentToken ''
+
+    name Define (type ; kind)
+
+    out =. out , 4 Consume ''
+
   end.
 
-  out =. out , 4 Consume ''  NB. ;
+  out =. out , 4 Consume ''
+
   out =. out , 2 TagLine '</classVarDec>'
 
   out
+
 )
 
 NB. ============================================================
@@ -667,6 +732,27 @@ CompileExpression =: 3 : 0
 )
 
 NB. ============================================================
+NB. Extract token value from XML token
+NB. Example:
+NB. <integerConstant> 7 </integerConstant>
+NB. -> 7
+NB. ============================================================
+
+GetTokenValue =: 3 : 0
+
+  tok =. y
+
+  gt =. tok i. '>'
+
+  rest =. (gt+1) }. tok
+
+  lt =. rest i. '<'
+
+  dltb lt {. rest
+
+)
+
+NB. ============================================================
 NB. term
 NB. ============================================================
 
@@ -770,12 +856,11 @@ ParseFile =: 3 : 0
 
   tokenFile =. base , 'T.xml'
   outputFile =. base , '.xml'
-
   tokenLines =. ReadParserTokens tokenFile
 
   finalXml =. CompileClass tokenLines
 
-  finalXml WriteFile outputFile
+    finalXml WriteFile outputFile
 
   smoutput 'Written: ' , outputFile
 )
