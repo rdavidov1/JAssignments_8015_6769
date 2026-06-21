@@ -7,10 +7,10 @@ NB. also writes VM code into Xxx.vm.
 NB. ============================================================
 
 NB. This path is for Ravid
-NB. load 'C:/Users/Home/Documents/temp/ex4/ex4.ijs'
+load 'C:/Users/Home/Documents/temp/ex4/ex4.ijs'
 
 NB. This path is for Hagit
-load '/Users/hagitassulin/DesignPatterns/J-Assignments/ex4/ex4.ijs'
+NB. load '/Users/hagitassulin/DesignPatterns/J-Assignments/ex4/ex4.ijs'
 
 NB. ============================================================
 NB. Project 11 - Global state
