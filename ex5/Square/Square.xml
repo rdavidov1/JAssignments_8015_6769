@@ -5,14 +5,17 @@
   <classVarDec>
     <keyword> field </keyword>
     <keyword> int </keyword>
+    <identifierInfo name="x" category="field" index="0" usage="declared" />
     <identifier> x </identifier>
     <symbol> , </symbol>
+    <identifierInfo name="y" category="field" index="1" usage="declared" />
     <identifier> y </identifier>
     <symbol> ; </symbol>
   </classVarDec>
   <classVarDec>
     <keyword> field </keyword>
     <keyword> int </keyword>
+    <identifierInfo name="size" category="field" index="2" usage="declared" />
     <identifier> size </identifier>
     <symbol> ; </symbol>
   </classVarDec>
@@ -23,12 +26,15 @@
     <symbol> ( </symbol>
     <parameterList>
       <keyword> int </keyword>
+      <identifierInfo name="Ax" category="argument" index="0" usage="declared" />
       <identifier> Ax </identifier>
       <symbol> , </symbol>
       <keyword> int </keyword>
+      <identifierInfo name="Ay" category="argument" index="1" usage="declared" />
       <identifier> Ay </identifier>
       <symbol> , </symbol>
       <keyword> int </keyword>
+      <identifierInfo name="Asize" category="argument" index="2" usage="declared" />
       <identifier> Asize </identifier>
     </parameterList>
     <symbol> ) </symbol>
@@ -37,6 +43,7 @@
       <statements>
         <letStatement>
           <keyword> let </keyword>
+          <identifierInfo name="x" category="field" index="0" usage="used" />
           <identifier> x </identifier>
           <symbol> = </symbol>
           <expression>
@@ -48,6 +55,7 @@
         </letStatement>
         <letStatement>
           <keyword> let </keyword>
+          <identifierInfo name="y" category="field" index="1" usage="used" />
           <identifier> y </identifier>
           <symbol> = </symbol>
           <expression>
@@ -59,6 +67,7 @@
         </letStatement>
         <letStatement>
           <keyword> let </keyword>
+          <identifierInfo name="size" category="field" index="2" usage="used" />
           <identifier> size </identifier>
           <symbol> = </symbol>
           <expression>
@@ -356,6 +365,7 @@
             </doStatement>
             <letStatement>
               <keyword> let </keyword>
+              <identifierInfo name="size" category="field" index="2" usage="used" />
               <identifier> size </identifier>
               <symbol> = </symbol>
               <expression>
@@ -426,6 +436,7 @@
             </doStatement>
             <letStatement>
               <keyword> let </keyword>
+              <identifierInfo name="size" category="field" index="2" usage="used" />
               <identifier> size </identifier>
               <symbol> = </symbol>
               <expression>
@@ -559,6 +570,7 @@
             </doStatement>
             <letStatement>
               <keyword> let </keyword>
+              <identifierInfo name="y" category="field" index="1" usage="used" />
               <identifier> y </identifier>
               <symbol> = </symbol>
               <expression>
@@ -737,6 +749,7 @@
             </doStatement>
             <letStatement>
               <keyword> let </keyword>
+              <identifierInfo name="y" category="field" index="1" usage="used" />
               <identifier> y </identifier>
               <symbol> = </symbol>
               <expression>
@@ -933,6 +946,7 @@
             </doStatement>
             <letStatement>
               <keyword> let </keyword>
+              <identifierInfo name="x" category="field" index="0" usage="used" />
               <identifier> x </identifier>
               <symbol> = </symbol>
               <expression>
@@ -1111,6 +1125,7 @@
             </doStatement>
             <letStatement>
               <keyword> let </keyword>
+              <identifierInfo name="x" category="field" index="0" usage="used" />
               <identifier> x </identifier>
               <symbol> = </symbol>
               <expression>
