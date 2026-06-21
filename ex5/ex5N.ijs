@@ -342,6 +342,11 @@ CompileSubroutine =: 3 : 0
   out =. 2 TagLine '<subroutineDec>'
 
   subroutineType =: GetTokenValue CurrentToken ''
+
+  if. subroutineType -: 'method' do.
+    'this' Define (className ; 'argument')
+  end.
+
   out =. out , 4 Consume ''
 
   out =. out , 4 Consume ''
