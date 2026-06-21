@@ -2,10 +2,10 @@ NB. ex5.ijs - Project 11
 NB. ============================================================
 
 NB. This path is for Ravid
-load 'C:/Users/Home/Documents/temp/ex4/ex4.ijs'
+NB.load 'C:/Users/Home/Documents/temp/ex4/ex4.ijs'
 
 NB. This path is for Hagit
-NB. load '/Users/hagitassulin/DesignPatterns/J-Assignments/ex4/ex4.ijs'
+load '/Users/hagitassulin/DesignPatterns/J-Assignments/ex4/ex4.ijs'
 
 NB. ============================================================
 NB. Project 11 - VM Code Generation
@@ -563,6 +563,9 @@ ParseFile =: 3 : 0
 expressionListCount =: 0
 
 CompileClass =: 3 : 0
+  classTable =: 0 4 $ <''
+  staticCount =: 0
+  fieldCount =: 0
   tokens_list =: y
   pointer =: 0
 
@@ -600,6 +603,19 @@ CompileSubroutineBody =: 3 : 0
 
   funcName =. className , '.' , subroutineName
     funcName WriteFunction varCount
+
+  if. subroutineType -: 'constructor' do.
+
+      'constant' WritePush fieldCount
+      'Memory.alloc' WriteCall 1
+      'pointer' WritePop 0
+
+  elseif. subroutineType -: 'method' do.
+
+      'argument' WritePush 0
+      'pointer' WritePop 0
+
+  end.
 
   out =. out , CompileStatements (y + 2)
 
@@ -832,28 +848,53 @@ CompileExpressionList =: 3 : 0
 
 CompileSubroutineCall =: 3 : 0
   out =. ''
+  nArgs =. 0
 
+  NB. first name: subroutineName / className / varName
   firstName =. GetTokenValue CurrentToken ''
   out =. out , y Consume ''
 
   if. TokenIs '.' do.
-    out =. out , y Consume ''
+    out =. out , y Consume ''  NB. consume '.'
+
     secondName =. GetTokenValue CurrentToken ''
     out =. out , y Consume ''
-    callName =. firstName , '.' , secondName
+
+    kind =. KindOf firstName
+
+    if. kind -: 'none' do.
+      NB. ClassName.function(...)
+      callName =. firstName , '.' , secondName
+    else.
+      NB. varName.method(...)
+      segment =. KindToSegment kind
+      index =. IndexOf firstName
+      objType =. TypeOf firstName
+
+      segment WritePush index
+      nArgs =. 1
+
+      callName =. objType , '.' , secondName
+    end.
+
   else.
+    NB. methodName(...) of current class
+    'pointer' WritePush 0
+    nArgs =. 1
+
     callName =. className , '.' , firstName
   end.
 
-  out =. out , y Consume ''  NB. (
-  out =. out , CompileExpressionList y
-  out =. out , y Consume ''  NB. )
+  out =. out , y Consume ''  NB. consume '('
 
-  callName WriteCall expressionListCount
+  out =. out , CompileExpressionList y
+
+  out =. out , y Consume ''  NB. consume ')'
+
+  callName WriteCall nArgs + expressionListCount
 
   out
 )
-
 CompileDo =: 3 : 0
     smoutput 'ENTER DO'
   out =. y TagLine '<doStatement>'
